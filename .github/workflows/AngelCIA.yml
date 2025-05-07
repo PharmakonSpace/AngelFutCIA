@@ -13,6 +13,7 @@ on:
     - cron: '45 8 * * 1-5'   # 02:15 PM IST
     - cron: '41 9 * * 1-5'   # 03:15 PM IST
   workflow_dispatch:
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -48,8 +49,8 @@ jobs:
 
       - name: Debug TOTP Key
         run: |
-           echo "TOTP_KEY length: ${#TOTP_KEY}"  # Check if the length is correct
-           echo "TOTP_KEY (masked): ${TOTP_KEY:0:4}******"  # Print first few characters
+           echo "TOTP_KEY length: ${#TOTP_KEY}"
+           echo "TOTP_KEY (masked): ${TOTP_KEY:0:4}******"
 
       - name: Debug environment variables
         run: env | grep -E 'client_id|APP_TYPE|secret_key|fyers_id|TOTP_KEY|pin|redirect_uri'
@@ -61,23 +62,23 @@ jobs:
           wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
           tar -xvzf ta-lib-0.4.0-src.tar.gz
           cd ta-lib
-          ./configure --prefix=/usr
+          ./configure --prefix=/usr/local
           make
           sudo make install
           cd ..
-      
-      - name: Set environment variables for linker
+
+      - name: Export TA-Lib library path
         run: |
-          echo "LD_LIBRARY_PATH=/usr/lib" >> $GITHUB_ENV
-      
+          echo "LD_LIBRARY_PATH=/usr/local/lib" >> $GITHUB_ENV
+          echo "/usr/local/lib" | sudo tee -a /etc/ld.so.conf.d/ta-lib.conf
+          sudo ldconfig
+
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip setuptools wheel
           pip install --no-cache-dir numpy
           pip install --no-cache-dir ta-lib
           pip install --no-cache-dir -r requirements.txt
-
-
 
       - name: Debug installed packages
         run: pip list
@@ -86,7 +87,6 @@ jobs:
         env:
           GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
         run: python AngelFutCIA.py
-
 
       - name: Configure Git
         run: |
