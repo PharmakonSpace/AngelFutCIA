@@ -10,7 +10,6 @@ pytz
 setuptools
 pycryptodome>=3.19.0
 pandas-ta
-ta
 openpyxl
 logzero
 websocket-client
