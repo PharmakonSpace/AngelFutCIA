@@ -32,8 +32,10 @@ API_SECRET = os.getenv("SMART_API_SECRET")
 CLIENT_CODE = os.getenv("SMART_CLIENT_CODE")
 PASSWORD = os.getenv("SMART_PASSWORD")
 TOTP_SECRET = os.getenv("SMART_TOTP_SECRET")
-SMART_API_OBJ = os.getenv('SMART_API_OBJ')
 
+# SmartAPI object
+SMART_API_OBJ = None
+TOKEN_MAP = pd.DataFrame()
 # Run Angelmasterlist.py
 script_dir = os.path.dirname(os.path.abspath(__file__))
 angel_script = os.path.join(script_dir, "Angelmasterlist.py")
