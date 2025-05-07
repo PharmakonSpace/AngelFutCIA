@@ -475,7 +475,7 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
             "todate": to_date_format
         }
 
-            response = credentials.SMART_API_OBJ.getCandleData(historicParam)
+            response = None.getCandleData(historicParam)
 
             if not response or 'data' not in response or not response['data']:
                 print(f"⚠️ API returned empty data for {symbol}. Retrying... (Attempt {attempt + 1}/3)")
