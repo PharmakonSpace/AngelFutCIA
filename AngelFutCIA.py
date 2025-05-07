@@ -22,8 +22,6 @@ import logging
 import subprocess
 from google.oauth2.service_account import Credentials
 import json
-# Load environment variables from .env file
-load_dotenv()
 # Run Angelmasterlist.py
 script_dir = os.path.dirname(os.path.abspath(__file__))
 angel_script = os.path.join(script_dir, "Angelmasterlist.py")
@@ -36,7 +34,7 @@ except subprocess.CalledProcessError as e:
     
 # Fetch credentials and Sheet ID from environment variables
 credentials_json = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
-SHEET_ID = "17y8FzzvHnc5jgMoS40H1WXxj133PgAcjfxYcXtoGwh4"
+SHEET_ID =  os.getenv ('SHEET_ID')
 
 if not credentials_json:
     raise ValueError("GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
