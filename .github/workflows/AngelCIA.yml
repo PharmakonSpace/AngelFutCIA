@@ -42,7 +42,7 @@ jobs:
           echo "APP_TYPE=${{ secrets.APP_TYPE }}" >> $GITHUB_ENV
           echo "secret_key=${{ secrets.SECRET_KEY }}" >> $GITHUB_ENV
           echo "fyers_id=${{ secrets.FYERS_ID }}" >> $GITHUB_ENV
-          echo "TOTP_KEY=${{ secrets.TOTP_KEY }}" >> $GITHUB_ENV
+          echo "TOTP_SECRET=${{ secrets.TOTP_SECRET }}" >> $GITHUB_ENV
           echo "pin=${{ secrets.PIN }}" >> $GITHUB_ENV
           echo "redirect_uri=${{ secrets.REDIRECT_URI }}" >> $GITHUB_ENV
           echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}" >> $GITHUB_ENV
