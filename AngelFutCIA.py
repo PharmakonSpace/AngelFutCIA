@@ -473,12 +473,12 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     for attempt in range(3):
         try:
             historicParam = {
-            "exchange": exchange,
-            "symboltoken": str(token),
-            "interval": interval,
-            "fromdate": from_date_format,
-            "todate": to_date_format
-        }
+                "exchange": exchange,
+                "symboltoken": str(token),
+                "interval": interval,
+                "fromdate": from_date_format,
+                "todate": to_date_format
+            }
 
             SMART_API_OBJ = os.getenv('SMART_API_OBJ')
 
@@ -488,8 +488,9 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
                 # Initialize the object (if necessary) here
                 # For example, if SMART_API_OBJ needs to be initialized with a key or config
                 SMART_API_OBJ = initialize_smart_api(SMART_API_OBJ)  # Pseudo code for initialization
-            
-                        if not response or 'data' not in response or not response['data']:
+
+            # This should be at the same indentation level as the code above
+            if not response or 'data' not in response or not response['data']:
                 print(f"⚠️ API returned empty data for {symbol}. Retrying... (Attempt {attempt + 1}/3)")
                 sleep(2)
                 continue
@@ -501,7 +502,7 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
             df = calculate_weekly_camarilla_pivots(df) 
             df = calculate_weekly_demark_pivots(df)
             df = calculate_chaikin_volatility(df)
-            df=  calculate_rvi(df)
+            df = calculate_rvi(df)
             df = apply_bull_bear_conditions(df)
             return df
 
@@ -513,29 +514,38 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     return None
 
 
+
 if __name__ == '__main__':
     initializeSymbolTokenMap()
 
-    try:
-        totp_secret = os.environ['TOTP_SECRET']
-        totp = pyotp.TOTP(totp_secret).now()
-    except KeyError:
-        print("TOTP_SECRET is missing in environment variables. Please add it to GitHub Secrets.")
+    # Fetch TOTP_SECRET from .env
+    TOTP_SECRET = os.getenv("TOTP_SECRET")
+    if not TOTP_SECRET:
+        print("TOTP_SECRET is missing in the .env file. Please add it.")
         exit()
 
     try:
-        api_key = os.environ['API_KEY']
-        user_name = os.environ['USER_NAME']
-        password = os.environ['PWD']
-    except KeyError as e:
-        print(f"{e.args[0]} is missing in environment variables.")
+        totp = pyotp.TOTP(TOTP_SECRET).now()
+    except Exception as e:
+        print(f"Error generating TOTP: {str(e)}")
         exit()
 
-    obj = SmartConnect(api_key=api_key)
+    # Fetch API_KEY, USER_NAME, and PWD from .env
+    API_KEY = os.getenv("API_KEY")
+    USER_NAME = os.getenv("USER_NAME")
+    PWD = os.getenv("PWD")
+
+    if not all([API_KEY, USER_NAME, PWD]):
+        print("API_KEY, USER_NAME, or PWD are missing in the .env file. Please add them.")
+        exit()
+
     try:
-        data = obj.generateSession(user_name, password, totp)
-        print("Login successful!")
-        # Store the object somewhere if needed, like a global variable or context
+        # Initialize the SmartConnect object
+        obj = SmartConnect(api_key=API_KEY)
+        data = obj.generateSession(USER_NAME, PWD, totp)
+        
+        # Instead of storing SMART_API_OBJ in an env variable, initialize it here
+        SMART_API_OBJ = obj
     except Exception as e:
         print(f"Login failed: {str(e)}")
         exit()
@@ -546,6 +556,7 @@ if __name__ == '__main__':
 
     worker()  # Start fetching data
 
+    # Assuming all_data is gathered in the worker function
     if all_data:
         final_df = pd.concat(all_data, ignore_index=True)
         final_df['timestamp'] = pd.to_datetime(final_df['timestamp'], utc=True).dt.tz_convert(IST_TZ)
