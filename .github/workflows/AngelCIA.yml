@@ -13,6 +13,7 @@ on:
     - cron: '45 8 * * 1-5'   # 02:15 PM IST
     - cron: '41 9 * * 1-5'   # 03:15 PM IST
   workflow_dispatch:
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -25,6 +26,17 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+
+      - name: Install TA-Lib C library
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget build-essential
+          wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
+          tar -xzvf ta-lib-0.4.0-src.tar.gz
+          cd ta-lib
+          ./configure --prefix=/usr
+          make
+          sudo make install
 
       - name: Remove conflicting logging package
         run: |
@@ -48,8 +60,8 @@ jobs:
 
       - name: Debug TOTP Key
         run: |
-           echo "TOTP_KEY length: ${#TOTP_KEY}"  # Check if the length is correct
-           echo "TOTP_KEY (masked): ${TOTP_KEY:0:4}******"  # Print first few characters
+          echo "TOTP_KEY length: ${#TOTP_KEY}"
+          echo "TOTP_KEY (masked): ${TOTP_KEY:0:4}******"
 
       - name: Debug environment variables
         run: env | grep -E 'client_id|APP_TYPE|secret_key|fyers_id|TOTP_KEY|pin|redirect_uri'
@@ -57,7 +69,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --no-cache-dir -r requirements.txt
-          pip install pyotp  # Ensure pyotp is installed
+          pip install pyotp
 
       - name: Debug installed packages
         run: pip list
@@ -66,7 +78,6 @@ jobs:
         env:
           GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
         run: python AngelFutCIA.py
-
 
       - name: Configure Git
         run: |
