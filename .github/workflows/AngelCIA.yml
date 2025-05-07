@@ -6,14 +6,13 @@ on:
       - main
   schedule:
     - cron: '45 3 * * 1-5'   # 09:15 AM IST
-    - cron: '45 4 * * 1-5'
-    - cron: '45 5 * * 1-5'
-    - cron: '41 6 * * 1-5'
-    - cron: '45 7 * * 1-5'
-    - cron: '45 8 * * 1-5'
-    - cron: '41 9 * * 1-5'
+    - cron: '45 4 * * 1-5'   # 10:15 AM IST
+    - cron: '45 5 * * 1-5'   # 11:15 AM IST
+    - cron: '41 6 * * 1-5'   # 12:15 PM IST
+    - cron: '45 7 * * 1-5'   # 01:15 PM IST
+    - cron: '45 8 * * 1-5'   # 02:15 PM IST
+    - cron: '41 9 * * 1-5'   # 03:15 PM IST
   workflow_dispatch:
-
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -22,15 +21,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
-
-      - name: Install TA-Lib system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libta-lib0 libta-lib-dev
+          python-version: '3.11'
 
       - name: Remove conflicting logging package
         run: |
@@ -54,23 +48,16 @@ jobs:
 
       - name: Debug TOTP Key
         run: |
-          echo "TOTP_KEY length: ${#TOTP_KEY}"
-          echo "TOTP_KEY (masked): ${TOTP_KEY:0:4}******"
+           echo "TOTP_KEY length: ${#TOTP_KEY}"  # Check if the length is correct
+           echo "TOTP_KEY (masked): ${TOTP_KEY:0:4}******"  # Print first few characters
 
       - name: Debug environment variables
         run: env | grep -E 'client_id|APP_TYPE|secret_key|fyers_id|TOTP_KEY|pin|redirect_uri'
 
-      - name: Install Python dependencies (excluding TA-Lib)
+      - name: Install dependencies
         run: |
-          pip install --no-cache-dir -r requirements.txt || true
-
-      - name: Install Python TA-Lib wrapper
-        run: |
-          pip install TA-Lib
-
-      - name: Uninstall pycrypto if present
-        run: |
-          pip uninstall -y pycrypto || true
+          pip install --no-cache-dir -r requirements.txt
+          pip install pyotp  # Ensure pyotp is installed
 
       - name: Debug installed packages
         run: pip list
@@ -79,6 +66,7 @@ jobs:
         env:
           GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
         run: python AngelFutCIA.py
+
 
       - name: Configure Git
         run: |
