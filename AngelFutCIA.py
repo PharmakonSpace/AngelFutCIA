@@ -639,6 +639,14 @@ def worker():
 
 if __name__ == '__main__':
     initializeSymbolTokenMap()
+    
+    # Try to load symbols
+    SYMBOL_LIST = fetch_symbols_from_csv()
+    if not SYMBOL_LIST:
+        print("❌ Failed to load symbols from CSV file")
+        exit(1)
+
+    # Get credentials directly from
 
     # Get credentials directly from environment variables
     username = os.getenv("USER_NAME")
