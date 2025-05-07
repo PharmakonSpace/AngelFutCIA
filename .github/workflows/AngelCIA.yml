@@ -38,9 +38,15 @@ jobs:
           make
           sudo make install
       
-          # Fix: move headers to expected subdirectory
-          sudo mkdir -p /usr/include/ta-lib
-          sudo mv /usr/include/ta_*.h /usr/include/ta-lib/
+          # Check if headers exist
+          if [ -f "/usr/include/ta-lib/ta_defs.h" ]; then
+            echo "TA-Lib headers installed correctly."
+          else
+            echo "TA-Lib headers are missing, installing manually..."
+            sudo mkdir -p /usr/include/ta-lib
+            sudo mv /home/runner/work/AngelFutCIA/AngelFutCIA/ta-lib/*.h /usr/include/ta-lib/
+          fi
+
 
       - name: Install Python dependencies (including TA-Lib)
         run: |
