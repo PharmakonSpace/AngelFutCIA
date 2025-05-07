@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import credentials
 import numpy as np
 from time import sleep
-from talib.abstract import RSI, ATR
+#from talib.abstract import RSI, ATR
 import pyotp
 import warnings
 import os
