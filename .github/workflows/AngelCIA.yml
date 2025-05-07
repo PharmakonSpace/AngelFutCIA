@@ -45,7 +45,7 @@ jobs:
           echo "TOTP_SECRET=${{ secrets.TOTP_SECRET }}" >> $GITHUB_ENV
           echo "PWD=${{ secrets.PWD }}" >> $GITHUB_ENV
           echo "FEED_TOKEN=${{ secrets.FEED_TOKEN }}" >> $GITHUB_ENV
-          echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}" >> $GITHUB_ENV
+          echo "SHEET_ID=${{ secrets.SHEET_ID }}" >> $GITHUB_ENV
 
       - name: Debug TOTP Key
         run: |
