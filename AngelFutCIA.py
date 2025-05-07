@@ -31,58 +31,8 @@ USER_NAME = os.getenv("USER_NAME")
 API_KEY = os.getenv("API_KEY")
 PWD = os.getenv("PWD")
 TOTP_SECRET = os.getenv("TOTP_SECRET")
-
-# SmartAPI object
-SMART_API_OBJ = None
-TOKEN_MAP = pd.DataFrame()
-totp = pyotp.TOTP(TOTP_SECRET)
-otp = totp.now()
-# Run Angelmasterlist.py
-script_dir = os.path.dirname(os.path.abspath(__file__))
-angel_script = os.path.join(script_dir, "Angelmasterlist.py")
-
-try:
-    subprocess.run(["python", angel_script], check=True)
-except subprocess.CalledProcessError as e:
-    print(f"❌ Failed to run Angelmasterlist.py: {e}")
-    exit()
-    
-# Fetch credentials and Sheet ID from environment variables
-credentials_json = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
-SHEET_ID =  os.getenv ('SHEET_ID')
-
-if not credentials_json:
-    raise ValueError("GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
-
-# Authenticate using the JSON string from environment
-credentials_info = json.loads(credentials_json)
-credentials = Credentials.from_service_account_info(
-    credentials_info,
-    scopes=["https://www.googleapis.com/auth/spreadsheets"]
-)
-client = gspread.authorize(credentials)
-
-# Open the Google Sheet by ID
-sheet = client.open_by_key(SHEET_ID)
-
-# Function to update data in a Google Sheet tab
-def upload_to_sheets(df, tab_name):
-    try:
-        # Replace problematic values with empty strings or a placeholder
-        df_clean = df.replace([float('inf'), float('-inf')], None)
-        df_clean = df_clean.fillna('')  # or use a placeholder like 'NA'
-
-        try:
-            worksheet = sheet.worksheet(tab_name)
-        except gspread.exceptions.WorksheetNotFound:
-            worksheet = sheet.add_worksheet(title=tab_name, rows="100", cols="20")
-
-        worksheet.clear()
-        worksheet.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
-        print(f"✅ Data uploaded to '{tab_name}' tab.")
-    except Exception as e:
-        print(f"❌ Google Sheet error for {tab_name}: {e}")
-
+SMART_API_OBJ= os.getenv("SMART_API_OBJ")
+TOKEN_MAP =  os.getenv("TOKEN_MAP")
 # Run Angelmasterlist.py
 script_dir = os.path.dirname(os.path.abspath(__file__))
 angel_script = os.path.join(script_dir, "Angelmasterlist.py")
@@ -172,14 +122,11 @@ def initializeSymbolTokenMap():
     token_df = pd.DataFrame.from_dict(d)
     token_df['expiry'] = pd.to_datetime(token_df['expiry'])
     token_df = token_df.astype({'strike': float})
-    global TOKEN_MAP
-    TOKEN_MAP = token_df
+    credentials.TOKEN_MAP = token_df
 
 def getTokenInfo(symbol):
-    global TOKEN_MAP
-    result = TOKEN_MAP[TOKEN_MAP['symbol'] == symbol]
-    ...
-
+    df = TOKEN_MAP
+    result = df[df['symbol'] == symbol]
 
     if result.empty:
         print(f"⚠️ Token not found for {symbol}")
@@ -418,7 +365,7 @@ def calculate_weekly_demark_pivots(df):
 
 
 def getExchangeSegment(symbol):
-    TOKEN_MAP = token_df
+    df = credentials.TOKEN_MAP
     result = df[df['symbol'] == symbol]
     if result.empty:
         return "NSE"  # default fallback
@@ -475,6 +422,8 @@ def apply_bull_bear_conditions(df):
 
     return df
 
+
+
 def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     # ✅ Ensure correct market hours: 9:15 AM - 3:30 PM IST
     today_ist = datetime.now(IST_TZ)
@@ -499,7 +448,7 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
             "fromdate": from_date_format,
             "todate": to_date_format
         }
-            SMART_API_OBJ = None
+
             response = SMART_API_OBJ.getCandleData(historicParam)
 
             if not response or 'data' not in response or not response['data']:
@@ -535,10 +484,10 @@ if __name__ == '__main__':
         print("TOTP_SECRET is missing in credentials. Please add it.")
         exit()
 
-    obj = SmartConnect(API_KEY)
+    obj = SmartConnect(api_key=credentials.API_KEY)
     try:
-        data = obj.generateSession((USER_NAME, PWD), totp)
-        SMART_API_OBJ = obj
+        data = obj.generateSession(USER_NAME, PWD, totp)
+        credentials.SMART_API_OBJ = obj
     except Exception as e:
         print(f"Login failed: {str(e)}")
         exit()
