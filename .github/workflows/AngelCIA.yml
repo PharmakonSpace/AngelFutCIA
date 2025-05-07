@@ -64,10 +64,15 @@ jobs:
           ./configure --prefix=/usr
           make
           sudo make install
-
+          cd ..
+      
+      - name: Set environment variables for linker
+        run: |
+          echo "LD_LIBRARY_PATH=/usr/lib" >> $GITHUB_ENV
       
       - name: Install Python dependencies
         run: |
+          pip install --upgrade pip setuptools wheel
           pip install --no-cache-dir numpy
           pip install --no-cache-dir ta-lib
           pip install --no-cache-dir -r requirements.txt
