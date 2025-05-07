@@ -52,7 +52,7 @@ jobs:
            echo "TOTP_KEY (masked): ${TOTP_KEY:0:4}******"
 
       - name: Debug environment variables
-        run: env | grep -E 'client_id|APP_TYPE|secret_key|fyers_id|TOTP_KEY|pin|redirect_uri'
+        run: env | grep -E 'USER_NAME|PWD|TOTP_SECRET|API_KEY|TOKEN_MAP|FEED_TOKEN|SHEET_ID'
 
      
       - name: Install Python dependencies
