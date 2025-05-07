@@ -13,3 +13,4 @@ pandas-ta
 ta
 openpyxl
 logzero
+websocket-client
