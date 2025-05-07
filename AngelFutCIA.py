@@ -34,6 +34,7 @@ TOTP_SECRET = os.getenv("TOTP_SECRET")
 SMART_API_OBJ= os.getenv("SMART_API_OBJ")
 TOKEN_MAP =  os.getenv("TOKEN_MAP")
 # Run Angelmasterlist.py
+# Run Angelmasterlist.py
 script_dir = os.path.dirname(os.path.abspath(__file__))
 angel_script = os.path.join(script_dir, "Angelmasterlist.py")
 
@@ -122,17 +123,17 @@ def initializeSymbolTokenMap():
     token_df = pd.DataFrame.from_dict(d)
     token_df['expiry'] = pd.to_datetime(token_df['expiry'])
     token_df = token_df.astype({'strike': float})
-    TOKEN_MAP = token_df
+    credentials.TOKEN_MAP = token_df
 
 def getTokenInfo(symbol):
-    print(f"Fetching token info for: {symbol}")
-    print(f"Type of df: {type(df)}")
-    print(f"First few characters if df is string: {str(df)[:100]}")
-    
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("Expected a DataFrame for token info, but got something else.")
-    
+    df = credentials.TOKEN_MAP
     result = df[df['symbol'] == symbol]
+
+    if result.empty:
+        print(f"⚠️ Token not found for {symbol}")
+        return None
+
+    return result.iloc[0]['token']
 
 
 def calculate_indicators(df, symbol):
@@ -365,7 +366,7 @@ def calculate_weekly_demark_pivots(df):
 
 
 def getExchangeSegment(symbol):
-    df = TOKEN_MAP
+    df = credentials.TOKEN_MAP
     result = df[df['symbol'] == symbol]
     if result.empty:
         return "NSE"  # default fallback
@@ -449,7 +450,7 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
             "todate": to_date_format
         }
 
-            response = SMART_API_OBJ.getCandleData(historicParam)
+            response = credentials.SMART_API_OBJ.getCandleData(historicParam)
 
             if not response or 'data' not in response or not response['data']:
                 print(f"⚠️ API returned empty data for {symbol}. Retrying... (Attempt {attempt + 1}/3)")
@@ -479,15 +480,15 @@ if __name__ == '__main__':
     initializeSymbolTokenMap()
 
     try:
-        totp = pyotp.TOTP(TOTP_SECRET).now()
+        totp = pyotp.TOTP(credentials.TOTP_SECRET).now()
     except AttributeError:
         print("TOTP_SECRET is missing in credentials. Please add it.")
         exit()
 
-    obj = SmartConnect(api_key=API_KEY)
+    obj = SmartConnect(api_key=credentials.API_KEY)
     try:
-        data = obj.generateSession(USER_NAME, PWD, totp)
-        SMART_API_OBJ = obj
+        data = obj.generateSession(credentials.USER_NAME, credentials.PWD, totp)
+        credentials.SMART_API_OBJ = obj
     except Exception as e:
         print(f"Login failed: {str(e)}")
         exit()
