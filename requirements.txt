@@ -14,4 +14,10 @@ openpyxl
 logzero
 websocket-client
 numpy==1.23.5
-ta-lib
+dateutils
+datetime
+urllib3
+schedule
+pandas_ta
+gspread_dataframe
+httpx
