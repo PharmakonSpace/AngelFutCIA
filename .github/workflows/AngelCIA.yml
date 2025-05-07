@@ -27,16 +27,15 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install TA-Lib C library
+      - name: Install Python dependencies (including TA-Lib)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget build-essential
-          wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
-          tar -xzvf ta-lib-0.4.0-src.tar.gz
-          cd ta-lib
-          ./configure --prefix=/usr
-          make
-          sudo make install
+          pip install --no-cache-dir numpy
+          export CFLAGS="-I/usr/include"
+          export LDFLAGS="-L/usr/lib"
+          pip install --no-cache-dir ta-lib
+          pip install --no-cache-dir -r requirements.txt
+          pip install pyotp
+
 
       - name: Remove conflicting logging package
         run: |
