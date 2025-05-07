@@ -55,13 +55,7 @@ jobs:
       - name: Debug environment variables
         run: env | grep -E 'client_id|APP_TYPE|secret_key|fyers_id|TOTP_KEY|pin|redirect_uri'
 
-      - name: Install TA-Lib via system package
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libta-lib0 libta-lib-dev
-          pip install ta-lib
-
-
+     
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip setuptools wheel
