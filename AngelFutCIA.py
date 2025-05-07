@@ -27,15 +27,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Smart API credentials from .env
-API_KEY = os.getenv("SMART_API_KEY")
-API_SECRET = os.getenv("SMART_API_SECRET")
-CLIENT_CODE = os.getenv("SMART_CLIENT_CODE")
-PASSWORD = os.getenv("SMART_PASSWORD")
-TOTP_SECRET = os.getenv("SMART_TOTP_SECRET")
+USER_NAME = os.getenv("USER_NAME")
+API_KEY = os.getenv("API_KEY")
+PSW = os.getenv("PWD")
+TOTP_SECRET = os.getenv("TOTP_SECRET")
 
 # SmartAPI object
 SMART_API_OBJ = None
 TOKEN_MAP = pd.DataFrame()
+totp = pyotp.TOTP(TOTP_SECRET)
+otp = totp.now()
 # Run Angelmasterlist.py
 script_dir = os.path.dirname(os.path.abspath(__file__))
 angel_script = os.path.join(script_dir, "Angelmasterlist.py")
@@ -171,11 +172,14 @@ def initializeSymbolTokenMap():
     token_df = pd.DataFrame.from_dict(d)
     token_df['expiry'] = pd.to_datetime(token_df['expiry'])
     token_df = token_df.astype({'strike': float})
-    credentials.TOKEN_MAP = token_df
+    global TOKEN_MAP
+    TOKEN_MAP = token_df
 
 def getTokenInfo(symbol):
-    df = credentials.TOKEN_MAP
-    result = df[df['symbol'] == symbol]
+    global TOKEN_MAP
+    result = TOKEN_MAP[TOKEN_MAP['symbol'] == symbol]
+    ...
+
 
     if result.empty:
         print(f"⚠️ Token not found for {symbol}")
@@ -414,7 +418,7 @@ def calculate_weekly_demark_pivots(df):
 
 
 def getExchangeSegment(symbol):
-    df = credentials.TOKEN_MAP
+    TOKEN_MAP = token_df
     result = df[df['symbol'] == symbol]
     if result.empty:
         return "NSE"  # default fallback
@@ -471,34 +475,32 @@ def apply_bull_bear_conditions(df):
 
     return df
 
-
-
 def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
+    # ✅ Ensure correct market hours: 9:15 AM - 3:30 PM IST
     today_ist = datetime.now(IST_TZ)
     to_date = today_ist.replace(hour=15, minute=30, second=0, microsecond=0)
     from_date = to_date - timedelta(days=15)
 
-    from_date_str = from_date.strftime("%Y-%m-%d 09:15")
-    to_date_str = to_date.strftime("%Y-%m-%d 15:30")
+    from_date_format = from_date.strftime("%Y-%m-%d 09:15")
+    to_date_format = to_date.strftime("%Y-%m-%d 15:30")
 
-    print(f"📅 Fetching data for {symbol} from {from_date_str} to {to_date_str}")
+    print(f"📅 Fetching data for {symbol} from {from_date_format} to {to_date_format}")
 
     if not token or pd.isna(token):
         print(f"❌ Error: Invalid token ({token}) for {symbol}")
         return None
-
     exchange = getExchangeSegment(symbol)
     for attempt in range(3):
         try:
-            params = {
-                "exchange": exchange,
-                "symboltoken": str(token),
-                "interval": interval,
-                "fromdate": from_date_str,
-                "todate": to_date_str
-            }
-
-            response = SMART_API_OBJ.getCandleData(params)
+            historicParam = {
+            "exchange": exchange,
+            "symboltoken": str(token),
+            "interval": interval,
+            "fromdate": from_date_format,
+            "todate": to_date_format
+        }
+            SMART_API_OBJ = None
+            response = SMART_API_OBJ.getCandleData(historicParam)
 
             if not response or 'data' not in response or not response['data']:
                 print(f"⚠️ API returned empty data for {symbol}. Retrying... (Attempt {attempt + 1}/3)")
@@ -506,13 +508,13 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
                 continue
 
             df = pd.DataFrame(response['data'], columns=['timestamp', 'O', 'H', 'L', 'C', 'V'])
-            df = calculate_indicators(df, symbol)
-            df = calculate_supertrend(df)
-            df = calculate_camarilla_pivots(df)
-            df = calculate_weekly_camarilla_pivots(df)
+            df = calculate_indicators(df, symbol)  # Ensure this modifies df
+            df = calculate_supertrend(df) 
+            df = calculate_camarilla_pivots(df) 
+            df = calculate_weekly_camarilla_pivots(df) 
             df = calculate_weekly_demark_pivots(df)
             df = calculate_chaikin_volatility(df)
-            df = calculate_rvi(df)
+            df=  calculate_rvi(df)
             df = apply_bull_bear_conditions(df)
             return df
 
@@ -523,32 +525,29 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     print(f"❌ API failed for {symbol} after 3 attempts.")
     return None
 
-def worker():
-    global all_data
-    for symbol in SYMBOL_LIST:
-        info = getTokenInfo(symbol)
-        if info:
-            df = getHistoricalAPI(symbol, info['token'])
-            if df is not None:
-                all_data.append(df)
 
 if __name__ == '__main__':
-    try:
-        totp = pyotp.TOTP(TOTP_SECRET).now()
-    except Exception as e:
-        print(f"❌ Error generating TOTP: {e}")
-        exit()
-
-    SMART_API_OBJ = SmartConnect(api_key=API_KEY)
-
-    try:
-        SMART_API_OBJ.generateSession(CLIENT_CODE, PASSWORD, totp)
-    except Exception as e:
-        print(f"❌ Login failed: {str(e)}")
-        exit()
-
     initializeSymbolTokenMap()
-    worker()
+
+    try:
+        totp = pyotp.TOTP(TOTP_SECRET=os.getenv("TOTP_SECRET")).now()
+    except AttributeError:
+        print("TOTP_SECRET is missing in credentials. Please add it.")
+        exit()
+
+    obj = SmartConnect(api_key=os.getenv("API_KEY"))
+    try:
+        data = obj.generateSession(os.getenv("USER_NAME"), os.getenv("PWD"), totp)
+        SMART_API_OBJ = obj
+    except Exception as e:
+        print(f"Login failed: {str(e)}")
+        exit()
+
+    # Add symbols to queue
+    for symbol in SYMBOL_LIST:
+        symbol_queue.put(symbol)
+
+    worker()  # Start fetching data
 
     if all_data:
         final_df = pd.concat(all_data, ignore_index=True)
