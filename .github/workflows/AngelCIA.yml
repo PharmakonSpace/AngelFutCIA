@@ -60,7 +60,6 @@ jobs:
         run: |
           pip install --upgrade pip setuptools wheel
           pip install --no-cache-dir numpy
-          pip install --no-cache-dir ta-lib
           pip install --no-cache-dir -r requirements.txt
 
       - name: Debug installed packages
