@@ -7,7 +7,7 @@ datetime
 pyotp
 urllib3
 pytz
-pycrypto
+pycryptodome
 pandas
 numpy==1.23.5
 schedule
