@@ -5,11 +5,12 @@ smartapi-python
 gspread
 oauth2client
 pandas
+pandas-ta
+ta
 pyotp
 pytz
 setuptools
 pycryptodome>=3.19.0
-pandas-ta
 openpyxl
 logzero
 websocket-client
@@ -18,14 +19,6 @@ dateutils
 datetime
 urllib3
 schedule
-pandas_ta
 gspread_dataframe
-httpx
-ta
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
-threadpoolctl
-
 
 
