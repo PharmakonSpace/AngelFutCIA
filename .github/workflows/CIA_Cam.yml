@@ -1,4 +1,4 @@
-name: Run CIACAM
+name: Run AngelFutCIA
 
 on:
   push:
@@ -65,7 +65,7 @@ jobs:
       - name: Run login script
         env:
           GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
-        run: python cia_cam.py
+        run: python AngelFutCIA.py
 
 
       - name: Configure Git
