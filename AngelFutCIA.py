@@ -1,12 +1,13 @@
 import requests
-import credentials
 from SmartApi import SmartConnect
 import pandas as pd
 import pandas_ta as ta
-import ta as ta_lib
+import ta
 from datetime import datetime, timedelta
+import credentials
 import numpy as np
 from time import sleep
+#from talib.abstract import RSI, ATR
 import pyotp
 import warnings
 import os
@@ -21,37 +22,54 @@ import logging
 import subprocess
 from google.oauth2.service_account import Credentials
 import json
-import hashlib
 from dotenv import load_dotenv
-
 # Load environment variables from .env file
 load_dotenv()
 
-# Debug - Check if .env is loaded properly
-print(f"Current working directory: {os.getcwd()}")
-print(f".env file exists: {os.path.exists('.env')}")
-
-# Get all credentials directly from environment variables
+# Smart API credentials from .env
 USER_NAME = os.getenv("USER_NAME")
 API_KEY = os.getenv("API_KEY")
 PWD = os.getenv("PWD")
 TOTP_SECRET = os.getenv("TOTP_SECRET")
-SHEET_ID = os.getenv("SHEET_ID", "17y8FzzvHnc5jgMoS40H1WXxj133PgAcjfxYcXtoGwh4")
-CREDENTIALS_FILE = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
-
-# Debug - Print credential status
-print("Environment variables loaded:")
-print(f"USER_NAME: {'Set' if USER_NAME else 'Not Set'}")
-print(f"API_KEY: {'Set' if API_KEY else 'Not Set'}")
-print(f"PWD: {'Set' if PWD else 'Not Set'}")
-print(f"TOTP_SECRET: {'Set' if TOTP_SECRET else 'Not Set'}")
-print(f"GOOGLE_SHEETS_CREDENTIALS: {'Set' if CREDENTIALS_FILE else 'Not Set'}")
-
-# Global variables
-SMART_API_OBJ = None
-TOKEN_MAP = None
-
+SMART_API_OBJ= os.getenv("SMART_API_OBJ")
+TOKEN_MAP =  os.getenv("TOKEN_MAP")
 # Run Angelmasterlist.py
+# Fetch credentials and Sheet ID from environment variables
+credentials_json = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
+SHEET_ID =  os.getenv ('SHEET_ID')
+
+if not credentials_json:
+    raise ValueError("GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
+
+# Authenticate using the JSON string from environment
+credentials_info = json.loads(credentials_json)
+credentials = Credentials.from_service_account_info(
+    credentials_info,
+    scopes=["https://www.googleapis.com/auth/spreadsheets"]
+)
+client = gspread.authorize(credentials)
+
+# Open the Google Sheet by ID
+sheet = client.open_by_key(SHEET_ID)
+
+# Function to update data in a Google Sheet tab
+def upload_to_sheets(df, tab_name):
+    try:
+        # Replace problematic values with empty strings or a placeholder
+        df_clean = df.replace([float('inf'), float('-inf')], None)
+        df_clean = df_clean.fillna('')  # or use a placeholder like 'NA'
+
+        try:
+            worksheet = sheet.worksheet(tab_name)
+        except gspread.exceptions.WorksheetNotFound:
+            worksheet = sheet.add_worksheet(title=tab_name, rows="100", cols="20")
+
+        worksheet.clear()
+        worksheet.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
+        print(f"✅ Data uploaded to '{tab_name}' tab.")
+    except Exception as e:
+        print(f"❌ Google Sheet error for {tab_name}: {e}")
+        
 script_dir = os.path.dirname(os.path.abspath(__file__))
 angel_script = os.path.join(script_dir, "Angelmasterlist.py")
 
@@ -59,173 +77,10 @@ try:
     subprocess.run(["python", angel_script], check=True)
 except subprocess.CalledProcessError as e:
     print(f"❌ Failed to run Angelmasterlist.py: {e}")
+    exit()
 
-# API Rate Limits
-MAX_REQUESTS_PER_SEC = 3
-BACKOFF_MULTIPLIER = 2
-MAX_BACKOFF = 30  # Maximum wait time
-
-symbol_queue = queue.Queue()
-all_data = []
-
-pd.set_option('future.no_silent_downcasting', True)
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# Google Sheets Integration
-SHEET_NAME = "1hrST"
-
-# Log file for sent alerts
-LOG_FILE = "sent_alerts.log"
-
-# ✅ Define IST timezone
-IST_TZ = pytz.timezone("Asia/Kolkata")
-
-warnings.filterwarnings('ignore')
-
-OUTPUT_FILE = "AngelFutCIA.csv"
-
-def authenticate_google_sheets():
-    """Authenticate with Google Sheets API using service account credentials"""
-    if not CREDENTIALS_FILE:
-        logging.error("GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
-        return None
-    
-    try:
-        # Parse the JSON credentials string from environment variable
-        credentials_info = json.loads(CREDENTIALS_FILE)
-        credentials = Credentials.from_service_account_info(
-            credentials_info,
-            scopes=["https://www.googleapis.com/auth/spreadsheets"]
-        )
-        client = gspread.authorize(credentials)
-        return client
-    except Exception as e:
-        logging.error(f"Failed to authenticate with Google Sheets: {e}")
-        return None
-
-def load_sent_alerts():
-    """Load previously sent alerts to avoid duplicates"""
-    if not os.path.exists(LOG_FILE):
-        return set()
-    
-    with open(LOG_FILE, 'r') as f:
-        return set(line.strip() for line in f)
-
-def send_telegram_alert(message):
-    """Send alert message via Telegram"""
-    # This function would need to be implemented if you want Telegram alerts
-    logging.info(f"Would send Telegram alert: {message}")
-    # Implement actual Telegram API call here if needed
-
-def row_hash(row):
-    """Generate a unique hash for a DataFrame row by concatenating all its values."""
-    row_string = ''.join(map(str, row.values))
-    return hashlib.sha256(row_string.encode()).hexdigest()
-
-def filter_valid_rows(df, today_date, now):
-    """Filter rows based on timestamp validity"""
-    if 'timestamp' not in df.columns:
-        return pd.DataFrame()
-    
-    try:
-        # Convert timestamp to datetime if it's not already
-        if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-        
-        # Get entries from today
-        today_mask = df['timestamp'].dt.strftime('%Y-%m-%d') == today_date
-        return df[today_mask].copy()
-    except Exception as e:
-        logging.error(f"Error filtering rows by date: {e}")
-        return pd.DataFrame()
-
-def upload_to_gsheet(sheet, data_to_append):
-    """Upload data to Google Sheet"""
-    if not data_to_append:
-        logging.info("No data to append to Google Sheets")
-        return
-    
-    try:
-        # Clear existing data
-        sheet.clear()
-        logging.info("Existing data cleared from the sheet.")
-        
-        # Append new data
-        sheet.append_rows(data_to_append)
-        logging.info(f"Successfully uploaded {len(data_to_append)} rows to Google Sheets")
-    except Exception as e:
-        logging.error(f"Failed to upload data to Google Sheets: {e}")
-        send_telegram_alert(f"Error uploading data to Google Sheets: {e}")
-
-def send_alerts(filtered_df, sent_alerts):
-    """Send alerts for new signals"""
-    for _, row in filtered_df.iterrows():
-        alert_id = f"{row['symbol']}_{row['timestamp']}_{row['Signal']}"
-        
-        if alert_id not in sent_alerts:
-            message = f"🔔 {row['Signal']} signal for {row['symbol']} at {row['timestamp']}"
-            send_telegram_alert(message)
-            
-            # Log the sent alert
-            with open(LOG_FILE, 'a') as f:
-                f.write(f"{alert_id}\n")
-            
-            sent_alerts.add(alert_id)
-
-def save_to_google_sheets(filtered_data):
-    """Save filtered data to Google Sheets"""
-    # Authenticate and connect to Google Sheets
-    client = authenticate_google_sheets()
-    if not client:
-        logging.error("Failed to authenticate with Google Sheets")
-        return
-    
-    try:
-        sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
-    except Exception as e:
-        logging.error(f"Failed to access Google Sheets worksheet: {e}")
-        send_telegram_alert(f"Error accessing Google Sheets: {e}")
-        return
-
-    # Prepare data to append
-    data_to_append = []
-    headers_written = False
-    sent_alerts = load_sent_alerts()
-
-    # Get today's date and the current time with timezone
-    kolkata_tz = pytz.timezone('Asia/Kolkata')
-    today_date = datetime.today().strftime('%Y-%m-%d')
-    now = pd.to_datetime(datetime.now())
-
-    for item in filtered_data:
-        df = item['data']
-        filtered_df = df[df['Bull'] | df['Bear'] | df['BullContinue'] | df['BearContinue'] | df['Dem_60/55'] | df['Cam_CIA'] | df['Cam_15/30i']]
-        
-        # Safely convert timestamp and filter rows                                                 
-        filtered_df = filter_valid_rows(filtered_df, today_date, now)
-
-        if not filtered_df.empty:
-            # Replace NaN values with empty strings
-            filtered_df = filtered_df.fillna("")
-
-            # Prepare data for Google Sheets
-            filtered_df['timestamp'] = filtered_df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
-
-            if not headers_written:
-                data_to_append.append(filtered_df.columns.tolist())
-                headers_written = True
-
-            data_to_append.extend(filtered_df.values.tolist())
-
-            # Send alerts after data is successfully uploaded
-            send_alerts(filtered_df, sent_alerts)
-
-    # Upload data to Google Sheets
-    upload_to_gsheet(sheet, data_to_append)
-
+# Google Sheets Credentials Setup
 def fetch_symbols_from_csv(file_path="Angel_MasterList.csv", column_name="symbol"):
-    """Fetch symbol list from CSV file"""
     try:
         df = pd.read_csv(file_path)
         symbols = df[column_name].dropna().astype(str).str.strip().tolist()
@@ -235,25 +90,79 @@ def fetch_symbols_from_csv(file_path="Angel_MasterList.csv", column_name="symbol
         print(f"❌ Error reading symbols: {e}")
         return []
 
+# API Rate Limits
+MAX_REQUESTS_PER_SEC = 3
+BACKOFF_MULTIPLIER = 2
+MAX_BACKOFF = 30  # Maximum wait time
+
+symbol_queue = queue.Queue()
+all_data = []
+
+def fetch_data(symbol):
+    """Fetch historical data with retry handling and token validation."""
+    token = getTokenInfo(symbol)
+
+    if not token or pd.isna(token):
+        print(f"⚠️ No token found for {symbol}, skipping.")
+        return
+
+    attempt = 0
+    backoff = 1  # Initial backoff delay
+
+    while attempt < 3:
+        df = getHistoricalAPI(symbol, token)
+
+        if df is not None:
+            all_data.append(df)
+            print(f"✅ Successfully fetched data for {symbol}")
+            return
+
+        attempt += 1
+        print(f"🔄 Retrying {symbol} in {backoff}s (Attempt {attempt}/3)")
+        time.sleep(backoff)
+        backoff = min(backoff * BACKOFF_MULTIPLIER, MAX_BACKOFF)
+
+    print(f"❌ Failed to fetch data for {symbol} after 3 attempts")
+
+
+def worker():
+    while not symbol_queue.empty():
+        symbol = symbol_queue.get()
+        fetch_data(symbol)
+        symbol_queue.task_done()
+
+# Using threads
+with ThreadPoolExecutor(max_workers=MAX_REQUESTS_PER_SEC) as executor:
+    for _ in range(MAX_REQUESTS_PER_SEC):
+        executor.submit(worker)
+
+symbol_queue.join()
+
+
+# Fetch SYMBOL_LIST from Google Sheets
+SYMBOL_LIST = fetch_symbols_from_csv()
+print(f"✅ SYMBOL_LIST fetched: {SYMBOL_LIST}")
+
+# ✅ Define IST timezone
+IST_TZ = pytz.timezone("Asia/Kolkata")
+
+warnings.filterwarnings('ignore')
+
+#SYMBOL_LIST = ['CDSL', 'IEX']
+OUTPUT_FILE = "AngelFutCIA.csv"
+
 def initializeSymbolTokenMap():
-    """Initialize symbol to token mapping from Angel Broking"""
-    global TOKEN_MAP
     url = 'https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json'
     d = requests.get(url).json()
+    global token_df
     token_df = pd.DataFrame.from_dict(d)
     token_df['expiry'] = pd.to_datetime(token_df['expiry'])
     token_df = token_df.astype({'strike': float})
-    TOKEN_MAP = token_df
-    print("✅ Symbol token map initialized")
+    credentials.TOKEN_MAP = token_df
 
 def getTokenInfo(symbol):
-    """Get token information for a symbol"""
-    global TOKEN_MAP
-    if TOKEN_MAP is None:
-        print("❌ Token map not initialized")
-        return None
-
-    result = TOKEN_MAP[TOKEN_MAP['symbol'] == symbol]
+    df = credentials.TOKEN_MAP
+    result = df[df['symbol'] == symbol]
 
     if result.empty:
         print(f"⚠️ Token not found for {symbol}")
@@ -261,8 +170,8 @@ def getTokenInfo(symbol):
 
     return result.iloc[0]['token']
 
+
 def calculate_indicators(df, symbol):
-    """Calculate basic technical indicators"""
     if df.empty:
         print(f"❌ No data available for {symbol}")
         return None
@@ -279,16 +188,17 @@ def calculate_indicators(df, symbol):
         return None
 
     # ✅ Calculate Technical Indicators
-    df['RSI'] = ta_lib.momentum.RSIIndicator(df['C'], window=14).rsi()
-    df['ATR'] = ta_lib.volatility.AverageTrueRange(df['H'], df['L'], df['C'], window=20).average_true_range()
-    df['ADX'] = ta_lib.trend.ADXIndicator(df['H'], df['L'], df['C'], window=14).adx()
+    df['RSI'] = ta.momentum.RSIIndicator(df['C'], window=14).rsi()
+    df['ATR'] = ta.volatility.AverageTrueRange(df['H'], df['L'], df['C'], window=20).average_true_range()
+    df['ADX'] = ta.trend.ADXIndicator(df['H'], df['L'], df['C'], window=14).adx()
     
-    df['EMA_20'] = ta_lib.trend.EMAIndicator(df['C'], window=20).ema_indicator()
-    df['EMA_50'] = ta_lib.trend.EMAIndicator(df['C'], window=50).ema_indicator()
-    df['EMA_200'] = ta_lib.trend.EMAIndicator(df['C'], window=200).ema_indicator()
+    df['EMA_20'] = ta.trend.EMAIndicator(df['C'], window=20).ema_indicator()
+    df['EMA_50'] = ta.trend.EMAIndicator(df['C'], window=50).ema_indicator()
+    df['EMA_200'] = ta.trend.EMAIndicator(df['C'], window=200).ema_indicator()
     
-    df['VWAP'] = ta_lib.volume.VolumeWeightedAveragePrice(df['H'], df['L'], df['C'], df['V']).volume_weighted_average_price()
+    df['VWAP'] = ta.volume.VolumeWeightedAveragePrice(df['H'], df['L'], df['C'], df['V']).volume_weighted_average_price()
 
+   
     df['symbol'] = symbol  # Add symbol column for merging
 
     df.fillna(0, inplace=True)  # Replace NaNs with 0
@@ -296,7 +206,6 @@ def calculate_indicators(df, symbol):
     return df
 
 def calculate_rvi(df, period=10, len_smooth=14):
-    """Calculate Relative Vigor Index"""
     src = df['close']
     stddev = src.rolling(window=period).std()
 
@@ -311,7 +220,6 @@ def calculate_rvi(df, period=10, len_smooth=14):
     return df
 
 def calculate_chaikin_volatility(df, ema_period=10, change_period=10):
-    """Calculate Chaikin Volatility"""
     # Step 1: EMA of the high-low range
     hl_range = df['high'] - df['low']
     ema_hl = hl_range.ewm(span=ema_period, adjust=False).mean()
@@ -322,10 +230,11 @@ def calculate_chaikin_volatility(df, ema_period=10, change_period=10):
     df['ChaikinVolatility'] = chaikin_volatility.fillna(0)
     return df
 
+
+# Calculate Supertrend Indicator
 def calculate_supertrend(df, period=10, multiplier=3):
-    """Calculate Supertrend Indicator"""
     # Rename columns to lowercase for pandas_ta compatibility
-    df = df.rename(columns={'H': 'high', 'L': 'low', 'C': 'close', 'O': 'open'})
+    df = df.rename(columns={'H': 'high', 'L': 'low', 'C': 'close'})
 
     df.ta.supertrend(length=period, multiplier=multiplier, append=True)
 
@@ -340,10 +249,12 @@ def calculate_supertrend(df, period=10, multiplier=3):
     return df
 
 def calculate_camarilla_pivots(df):
-    """Calculate Camarilla Pivot Points"""
     if df.empty:
         print("⚠️ DataFrame is empty, skipping Camarilla pivot calculation.")
         return df
+
+    # Print column names before renaming to ensure they match
+    print("Columns before renaming:", df.columns)
 
     # Convert timestamp to datetime and extract date
     df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -386,10 +297,12 @@ def calculate_camarilla_pivots(df):
     return df
 
 def calculate_weekly_camarilla_pivots(df):
-    """Calculate Weekly Camarilla Pivot Points"""
     if df.empty:
         print("⚠️ DataFrame is empty, skipping Camarilla pivot calculation.")
         return df
+
+    # Print column names before renaming to ensure they match
+    print("Columns before renaming:", df.columns)
 
     # Convert timestamp to datetime
     df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -398,8 +311,16 @@ def calculate_weekly_camarilla_pivots(df):
     rename_dict = {'H': 'high', 'L': 'low', 'C': 'close', 'O': 'open'}
     df.rename(columns=rename_dict, inplace=True)
 
+    # Check if required columns are present after renaming
+    if not all(col in df.columns for col in ['high', 'low', 'close']):
+        print("⚠️ Missing required columns for Camarilla calculation: 'high', 'low', 'close'")
+        return df
+
     # Extract week start date
     df['week'] = df['timestamp'].dt.to_period('W').apply(lambda r: r.start_time)  # Get the start of the week
+
+    # Print the week column values to ensure correct extraction
+    print("Week column values:", df['week'].head())
 
     # Aggregating high, low, and close prices by week
     weekly_df = df.groupby('week').agg({'high': 'max', 'low': 'min', 'close': 'last'}).dropna()
@@ -420,11 +341,13 @@ def calculate_weekly_camarilla_pivots(df):
 
     # Merging the Camarilla data back into the original DataFrame
     df = df.merge(weekly_df[['week', 'W_PP', 'W_R1', 'W_R2', 'W_R3', 'W_R4', 'W_S1', 'W_S2', 'W_S3', 'W_S4']], on="week", how="left")
+
+    # Debug: Print weekly data to verify it's correctly calculated
+    print(f"✅ Weekly Camarilla Data:\n{weekly_df.head()}")
     
     return df
 
 def calculate_weekly_demark_pivots(df):
-    """Calculate Weekly DeMark Pivot Points"""
     if df.empty:
         print("⚠️ DataFrame is empty, skipping DeMark pivot calculation.")
         return df
@@ -472,21 +395,21 @@ def calculate_weekly_demark_pivots(df):
     # Optional: Format week for display
     df['week'] = df['week'].dt.strftime('%Y-%m-%d')
 
+    print("✅ DeMark Pivots calculated based on previous week's OHLC.")
     return df
 
+
+
 def getExchangeSegment(symbol):
-    """Get exchange segment for a symbol"""
-    global TOKEN_MAP
-    if TOKEN_MAP is None:
-        return "NSE"  # default fallback
-        
-    result = TOKEN_MAP[TOKEN_MAP['symbol'] == symbol]
+    df = credentials.TOKEN_MAP
+    result = df[df['symbol'] == symbol]
     if result.empty:
         return "NSE"  # default fallback
     return result.iloc[0]['exch_seg']  # Should return 'NSE', 'NFO', etc.
 
+
+
 def apply_bull_bear_conditions(df):
-    """Apply bull/bear pattern recognition conditions"""
     required_cols = ['close', 'Supertrend', 'R1_Demark', 'S1_Demark', 'ChaikinVolatility', 'RVI']
     for col in required_cols:
         if col not in df.columns:
@@ -507,6 +430,7 @@ def apply_bull_bear_conditions(df):
         (df['close'] < df['Supertrend']) &
         (df['close'] < df['S1_Demark']) &
         (df['close'].shift(1) > df['S1_Demark']) &
+        #(df['ChaikinVolatility'] < 0) &
         (df['RVI'] < 50)
     )
 
@@ -521,33 +445,22 @@ def apply_bull_bear_conditions(df):
         (df['close'] < df['S1_Demark'])
     )
 
-    # Initialize boolean columns for filtering
-    df['Bull'] = bull_condition
-    df['Bear'] = bear_condition
-    df['BullContinue'] = bull_continue & ~bull_condition
-    df['BearContinue'] = bear_continue & ~bear_condition
-    
-    # For compatibility with existing filters, also need these columns
-    df['Dem_60/55'] = False  # Placeholder
-    df['Cam_CIA'] = False    # Placeholder
-    df['Cam_15/30i'] = False # Placeholder
-
     # Initialize signal column
     df['Signal'] = 'Neutral'
+
     df.loc[bull_condition, 'Signal'] = 'Bull'
     df.loc[bear_condition, 'Signal'] = 'Bear'
     df.loc[(bull_continue) & (df['Signal'] == 'Neutral'), 'Signal'] = 'BullContinue'
     df.loc[(bear_continue) & (df['Signal'] == 'Neutral'), 'Signal'] = 'BearContinue'
 
+    # Remove Neutral rows
+    df = df[df['Signal'] != 'Neutral']
+
     return df
 
+
+
 def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
-    """Fetch historical price data from Angel Broking API"""
-    global SMART_API_OBJ
-    if SMART_API_OBJ is None:
-        print("❌ Smart API object not initialized")
-        return None
-        
     # ✅ Ensure correct market hours: 9:15 AM - 3:30 PM IST
     today_ist = datetime.now(IST_TZ)
     to_date = today_ist.replace(hour=15, minute=30, second=0, microsecond=0)
@@ -561,19 +474,18 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     if not token or pd.isna(token):
         print(f"❌ Error: Invalid token ({token}) for {symbol}")
         return None
-        
     exchange = getExchangeSegment(symbol)
     for attempt in range(3):
         try:
             historicParam = {
-                "exchange": exchange,
-                "symboltoken": str(token),
-                "interval": interval,
-                "fromdate": from_date_format,
-                "todate": to_date_format
-            }
+            "exchange": exchange,
+            "symboltoken": str(token),
+            "interval": interval,
+            "fromdate": from_date_format,
+            "todate": to_date_format
+        }
 
-            response = SMART_API_OBJ.getCandleData(historicParam)
+            response = credentials.SMART_API_OBJ.getCandleData(historicParam)
 
             if not response or 'data' not in response or not response['data']:
                 print(f"⚠️ API returned empty data for {symbol}. Retrying... (Attempt {attempt + 1}/3)")
@@ -581,99 +493,42 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
                 continue
 
             df = pd.DataFrame(response['data'], columns=['timestamp', 'O', 'H', 'L', 'C', 'V'])
-            df = calculate_indicators(df, symbol)  # Basic indicators
-            
-            if df is not None:
-                df = calculate_supertrend(df) 
-                df = calculate_camarilla_pivots(df) 
-                df = calculate_weekly_camarilla_pivots(df) 
-                df = calculate_weekly_demark_pivots(df)
-                df = calculate_chaikin_volatility(df)
-                df = calculate_rvi(df)
-                df = apply_bull_bear_conditions(df)
-                return df
+            df = calculate_indicators(df, symbol)  # Ensure this modifies df
+            df = calculate_supertrend(df) 
+            df = calculate_camarilla_pivots(df) 
+            df = calculate_weekly_camarilla_pivots(df) 
+            df = calculate_weekly_demark_pivots(df)
+            df = calculate_chaikin_volatility(df)
+            df=  calculate_rvi(df)
+            df = apply_bull_bear_conditions(df)
+            return df
 
         except Exception as e:
             print(f"❌ Error fetching data for {symbol}: {str(e)}")
-            sleep(2)
-            continue
+            return None
 
     print(f"❌ API failed for {symbol} after 3 attempts.")
     return None
 
-def fetch_data(symbol):
-    """Fetch historical data with retry handling and token validation."""
-    token = getTokenInfo(symbol)
-
-    if not token or pd.isna(token):
-        print(f"⚠️ No token found for {symbol}, skipping.")
-        return
-
-    attempt = 0
-    backoff = 1  # Initial backoff delay
-
-    while attempt < 3:
-        df = getHistoricalAPI(symbol, token)
-
-        if df is not None:
-            all_data.append({'symbol': symbol, 'data': df})
-            print(f"✅ Successfully fetched data for {symbol}")
-            return
-
-        attempt += 1
-        print(f"🔄 Retrying {symbol} in {backoff}s (Attempt {attempt}/3)")
-        time.sleep(backoff)
-        backoff = min(backoff * BACKOFF_MULTIPLIER, MAX_BACKOFF)
-
-    print(f"❌ Failed to fetch data for {symbol} after 3 attempts")
-
-def worker():
-    """Worker function for the thread pool"""
-    while not symbol_queue.empty():
-        symbol = symbol_queue.get()
-        try:
-            fetch_data(symbol)
-        except Exception as e:
-            print(f"❌ Error processing {symbol}: {str(e)}")
-        finally:
-            symbol_queue.task_done()
 
 if __name__ == '__main__':
     initializeSymbolTokenMap()
-    
-    # Try to load symbols
-    SYMBOL_LIST = fetch_symbols_from_csv()
-    if not SYMBOL_LIST:
-        print("❌ Failed to load symbols from CSV file")
-        exit(1)
 
-    # Get credentials directly from
-
-    # Get credentials directly from environment variables
-    username = os.getenv("USER_NAME")
-    api_key = os.getenv("API_KEY")
-    password = os.getenv("PWD")
-    totp_secret = os.getenv("TOTP_SECRET")
-    
-    # Validate that all credentials are present
-    if not all([username, api_key, password, totp_secret]):
-        print("❌ Missing credential(s) in .env file. Please check your configuration.")
-        print(f"USER_NAME: {'✓' if username else '✗'}")
-        print(f"API_KEY: {'✓' if api_key else '✗'}")
-        print(f"PWD: {'✓' if password else '✗'}")
-        print(f"TOTP_SECRET: {'✓' if totp_secret else '✗'}")
-        exit()
-    
     try:
-        totp = pyotp.TOTP(totp_secret).now()
-        obj = SmartConnect(api_key=api_key)
-        data = obj.generateSession(username, password, totp)
-        credentials.SMART_API_OBJ = obj  # Store for use in other functions
-    except Exception as e:
-        print(f"❌ Login failed: {str(e)}")
+        totp = pyotp.TOTP(credentials.TOTP_SECRET).now()
+    except AttributeError:
+        print("TOTP_SECRET is missing in credentials. Please add it.")
         exit()
-        
-   # Add symbols to queue
+
+    obj = SmartConnect(api_key=credentials.API_KEY)
+    try:
+        data = obj.generateSession(credentials.USER_NAME, credentials.PWD, totp)
+        credentials.SMART_API_OBJ = obj
+    except Exception as e:
+        print(f"Login failed: {str(e)}")
+        exit()
+
+    # Add symbols to queue
     for symbol in SYMBOL_LIST:
         symbol_queue.put(symbol)
 
