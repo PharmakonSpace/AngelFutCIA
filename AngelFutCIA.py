@@ -125,14 +125,14 @@ def initializeSymbolTokenMap():
     TOKEN_MAP = token_df
 
 def getTokenInfo(symbol):
-    df = TOKEN_MAP
+    print(f"Fetching token info for: {symbol}")
+    print(f"Type of df: {type(df)}")
+    print(f"First few characters if df is string: {str(df)[:100]}")
+    
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Expected a DataFrame for token info, but got something else.")
+    
     result = df[df['symbol'] == symbol]
-
-    if result.empty:
-        print(f"⚠️ Token not found for {symbol}")
-        return None
-
-    return result.iloc[0]['token']
 
 
 def calculate_indicators(df, symbol):
