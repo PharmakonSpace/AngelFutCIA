@@ -22,4 +22,10 @@ pandas_ta
 gspread_dataframe
 httpx
 ta
-ta-lib
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+threadpoolctl
+
+
+
