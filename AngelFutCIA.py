@@ -1,10 +1,10 @@
+import requests
 from SmartApi import SmartConnect
 import pandas as pd
 import pandas_ta as ta
 import ta
 from datetime import datetime, timedelta
 import credentials
-import requests
 import numpy as np
 from time import sleep
 from talib.abstract import RSI, ATR
@@ -12,7 +12,6 @@ import pyotp
 import warnings
 import os
 import pytz
-import ta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import threading
