@@ -22,4 +22,4 @@ pandas_ta
 gspread_dataframe
 httpx
 ta
-Ta-Lib
+ta-lib
