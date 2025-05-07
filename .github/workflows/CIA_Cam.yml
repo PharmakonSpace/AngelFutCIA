@@ -58,8 +58,12 @@ jobs:
         run: |
           pip install --no-cache-dir -r requirements.txt
           pip install pyotp  # Ensure pyotp is installed
-      - name: Install smartapi-python
-        run: pip install smartapi-python
+          
+      - name: Uninstall pycrypto if present
+        run: |
+             pip uninstall -y pycrypto || true
+
+
 
       - name: Debug installed packages
         run: pip list
