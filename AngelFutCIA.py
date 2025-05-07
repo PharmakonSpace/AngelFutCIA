@@ -1,4 +1,5 @@
 import requests
+import credentials
 from SmartApi import SmartConnect
 import pandas as pd
 import pandas_ta as ta
