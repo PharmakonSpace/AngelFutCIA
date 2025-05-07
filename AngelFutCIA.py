@@ -26,6 +26,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+SMART_API_OBJ = os.getenv('SMART_API_OBJ')
 # Run Angelmasterlist.py
 script_dir = os.path.dirname(os.path.abspath(__file__))
 angel_script = os.path.join(script_dir, "Angelmasterlist.py")
@@ -478,10 +479,17 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
             "fromdate": from_date_format,
             "todate": to_date_format
         }
-            SMART_API_OBJ = os.environ['SMART_API_OBJ']
-            response = SMART_API_OBJ.getCandleData(historicParam)
 
-            if not response or 'data' not in response or not response['data']:
+            SMART_API_OBJ = os.getenv('SMART_API_OBJ')
+
+            if SMART_API_OBJ is None:
+                print("Error: SMART_API_OBJ not found in environment variables.")
+            else:
+                # Initialize the object (if necessary) here
+                # For example, if SMART_API_OBJ needs to be initialized with a key or config
+                SMART_API_OBJ = initialize_smart_api(SMART_API_OBJ)  # Pseudo code for initialization
+            
+                        if not response or 'data' not in response or not response['data']:
                 print(f"⚠️ API returned empty data for {symbol}. Retrying... (Attempt {attempt + 1}/3)")
                 sleep(2)
                 continue
