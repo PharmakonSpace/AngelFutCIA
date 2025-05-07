@@ -63,6 +63,106 @@ MAX_BACKOFF = 30  # Maximum wait time
 symbol_queue = queue.Queue()
 all_data = []
 
+
+
+
+pd.set_option('future.no_silent_downcasting', True)
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Fetch credentials and Sheet ID from environment variables
+CREDENTIALS_FILE = os.getenv('GOOGLE_SHEETS_CREDENTIALS')  # JSON string
+SHEET_ID = "17y8FzzvHnc5jgMoS40H1WXxj133PgAcjfxYcXtoGwh4"
+
+if not CREDENTIALS_FILE:
+    raise ValueError("GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
+
+# Authenticate using the JSON string from environment
+credentials_info = json.loads(CREDENTIALS_FILE)
+credentials = Credentials.from_service_account_info(
+    credentials_info,
+    scopes=["https://www.googleapis.com/auth/spreadsheets"]
+)
+client = gspread.authorize(credentials)
+
+# Open the Google Sheet by ID
+sheet = client.open_by_key(SHEET_ID)
+# Google Sheets Integration
+SHEET_NAME = "1hrST"
+
+# Log file for sent alerts
+LOG_FILE = "sent_alerts.log"
+
+# Authenticate Google Sheets
+def authenticate_google_sheets():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+    return gspread.authorize(creds)
+
+def row_hash(row):
+    """
+    Generate a unique hash for a DataFrame row by concatenating all its values.
+    """
+    row_string = ''.join(map(str, row.values))
+    return hashlib.sha256(row_string.encode()).hexdigest()
+
+def save_to_google_sheets(filtered_data):
+    try:
+        # Authenticate and connect to Google Sheets
+        client = authenticate_google_sheets()
+        sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
+    except Exception as e:
+        logging.error(f"Failed to authenticate or access Google Sheets: {e}")
+        send_telegram_alert(f"Error accessing Google Sheets: {e}")
+        return
+
+    # Clear existing data
+    try:
+        sheet.clear()
+        logging.info("Existing data cleared from the sheet.")
+    except Exception as e:
+        logging.error(f"Failed to clear existing data from Google Sheets: {e}")
+        send_telegram_alert(f"Error clearing data from Google Sheets: {e}")
+        return
+
+    # Prepare data to append
+    data_to_append = []
+    headers_written = False
+    sent_alerts = load_sent_alerts()
+
+    # Get today's date and the current time with timezone
+    kolkata_tz = pytz.timezone('Asia/Kolkata')
+    today_date = datetime.today().strftime('%Y-%m-%d')
+    now = pd.to_datetime(datetime.now())
+    yesterday = (now - timedelta(days=1)).strftime('%Y-%m-%d')
+
+    for item in filtered_data:
+        df = item['data']
+        filtered_df = df[df['Bull'] | df['Bear'] | df['BullContinue'] | df['BearContinue'] | df['Dem_60/55'] | df['Cam_CIA'] | df['Cam_15/30i']]  # Rows where ST_Retest or ST_Breakout is True
+        
+        # Safely convert timestamp and filter rows                                                 
+        filtered_df = filter_valid_rows(filtered_df, today_date, now)
+
+        if not filtered_df.empty:
+            # Replace NaN values with empty strings
+            filtered_df = filtered_df.fillna("")
+
+            # Prepare data for Google Sheets
+            filtered_df['timestamp'] = filtered_df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
+
+            if not headers_written:
+                data_to_append.append(filtered_df.columns.tolist())
+                headers_written = True
+
+            data_to_append.extend(filtered_df.values.tolist())
+
+            # Send alerts after data is successfully uploaded
+            send_alerts(filtered_df, sent_alerts)
+
+    # Upload data to Google Sheets
+    upload_to_gsheet(sheet, data_to_append)
+
+
 def fetch_data(symbol):
     """Fetch historical data with retry handling and token validation."""
     token = getTokenInfo(symbol)
