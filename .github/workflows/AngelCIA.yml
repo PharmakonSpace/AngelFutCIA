@@ -39,11 +39,10 @@ jobs:
       - name: Load environment variables
         run: |
           echo "USER_NAME=${{ secrets.USER_NAME }}" >> $GITHUB_ENV
-          echo "APP_TYPE=${{ secrets.APP_TYPE }}" >> $GITHUB_ENV
+          echo "PWD=${{ secrets.PWD }}" >> $GITHUB_ENV
+          echo "TOTP_SECRET=${{ secrets.TOTP_SECRET }}" >> $GITHUB_ENV
           echo "API_KEY=${{ secrets.API_KEY }}" >> $GITHUB_ENV
           echo "TOKEN_MAP=${{ secrets.TOKEN_MAP }}" >> $GITHUB_ENV
-          echo "TOTP_SECRET=${{ secrets.TOTP_SECRET }}" >> $GITHUB_ENV
-          echo "PWD=${{ secrets.PWD }}" >> $GITHUB_ENV
           echo "FEED_TOKEN=${{ secrets.FEED_TOKEN }}" >> $GITHUB_ENV
           echo "SHEET_ID=${{ secrets.SHEET_ID }}" >> $GITHUB_ENV
 
