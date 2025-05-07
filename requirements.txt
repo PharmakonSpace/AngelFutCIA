@@ -1,8 +1,7 @@
 requests
 bs4
 python-dotenv
-fyers_apiv3
-fyers_api
+smartapi
 dateutils
 datetime
 pyotp
