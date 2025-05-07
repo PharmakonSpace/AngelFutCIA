@@ -506,15 +506,25 @@ if __name__ == '__main__':
     initializeSymbolTokenMap()
 
     try:
-        totp = pyotp.TOTP(credentials.TOTP_SECRET).now()
-    except AttributeError:
-        print("TOTP_SECRET is missing in credentials. Please add it.")
+        totp_secret = os.environ['TOTP_SECRET']
+        totp = pyotp.TOTP(totp_secret).now()
+    except KeyError:
+        print("TOTP_SECRET is missing in environment variables. Please add it to GitHub Secrets.")
         exit()
 
-    obj = SmartConnect(api_key=credentials.API_KEY)
     try:
-        data = obj.generateSession(credentials.USER_NAME, credentials.PWD, totp)
-        credentials.SMART_API_OBJ = obj
+        api_key = os.environ['API_KEY']
+        user_name = os.environ['USER_NAME']
+        password = os.environ['PWD']
+    except KeyError as e:
+        print(f"{e.args[0]} is missing in environment variables.")
+        exit()
+
+    obj = SmartConnect(api_key=api_key)
+    try:
+        data = obj.generateSession(user_name, password, totp)
+        print("Login successful!")
+        # Store the object somewhere if needed, like a global variable or context
     except Exception as e:
         print(f"Login failed: {str(e)}")
         exit()
