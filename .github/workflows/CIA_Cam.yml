@@ -54,10 +54,10 @@ jobs:
       - name: Debug environment variables
         run: env | grep -E 'client_id|APP_TYPE|secret_key|fyers_id|TOTP_KEY|pin|redirect_uri'
 
-      - name: Install dependencies
+      - name: Disable pip cache for clean install
         run: |
-          pip install --no-cache-dir -r requirements.txt
-          pip install pyotp  # Ensure pyotp is installed
+           pip install --no-cache-dir -r requirements.txt
+
           
       - name: Uninstall pycrypto if present
         run: |
