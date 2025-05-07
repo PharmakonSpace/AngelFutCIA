@@ -1,7 +1,6 @@
 requests
 bs4
 python-dotenv
-smartapi-python
 smartapi
 gspread
 oauth2client
