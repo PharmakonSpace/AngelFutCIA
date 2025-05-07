@@ -27,14 +27,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Smart API credentials from .env
-USER_NAME = os.getenv("USER_NAME")
-API_KEY = os.getenv("API_KEY")
-PWD = os.getenv("PWD")
-TOTP_SECRET = os.getenv("TOTP_SECRET")
-SMART_API_OBJ= os.getenv("SMART_API_OBJ")
-TOKEN_MAP =  os.getenv("TOKEN_MAP")
+
 # Run Angelmasterlist.py
-        
+# Update credentials module with environment variables
+credentials.USER_NAME = os.getenv("USER_NAME")
+credentials.API_KEY = os.getenv("API_KEY")
+credentials.PWD = os.getenv("PWD")
+credentials.TOTP_SECRET = os.getenv("TOTP_SECRET")        
 script_dir = os.path.dirname(os.path.abspath(__file__))
 angel_script = os.path.join(script_dir, "Angelmasterlist.py")
 
