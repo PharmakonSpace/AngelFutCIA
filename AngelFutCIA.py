@@ -20,7 +20,7 @@ import queue
 import time
 from concurrent.futures import ThreadPoolExecutor
 import logging
-import subprocess
+#import subprocess
 from google.oauth2.service_account import Credentials
 import json
 
@@ -61,15 +61,6 @@ def upload_to_sheets(df, tab_name):
     except Exception as e:
         print(f"❌ Google Sheet error for {tab_name}: {e}")
 
-# Run Angelmasterlist.py
-script_dir = os.path.dirname(os.path.abspath(__file__))
-angel_script = os.path.join(script_dir, "Angelmasterlist.py")
-
-try:
-    subprocess.run(["python", angel_script], check=True)
-except subprocess.CalledProcessError as e:
-    print(f"❌ Failed to run Angelmasterlist.py: {e}")
-    exit()
 
 # Google Sheets Credentials Setup
 def fetch_symbols_from_csv(file_path="Angel_MasterList.csv", column_name="symbol"):
