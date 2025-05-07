@@ -7,4 +7,6 @@ gspread
 oauth2client
 pandas
 pycryptodome>=3.19.0
+pycryptodome
 pyotp
+pytz
