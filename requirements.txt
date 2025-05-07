@@ -22,3 +22,4 @@ pandas_ta
 gspread_dataframe
 httpx
 ta
+talib
