@@ -479,6 +479,8 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
             "todate": to_date_format
         }
 
+            # Hardcode SMART_API_OBJ as None (no longer using credentials)
+            SMART_API_OBJ = None
             if SMART_API_OBJ is not None:
                 response = SMART_API_OBJ.getCandleData(historicParam)
             else:
