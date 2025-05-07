@@ -21,7 +21,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import subprocess
-from oauth2client.service_account import ServiceAccountCredentials
 from google.oauth2.service_account import Credentials
 import json
 
