@@ -29,7 +29,7 @@ load_dotenv()
 # Smart API credentials from .env
 USER_NAME = os.getenv("USER_NAME")
 API_KEY = os.getenv("API_KEY")
-PSW = os.getenv("PWD")
+PWD = os.getenv("PWD")
 TOTP_SECRET = os.getenv("TOTP_SECRET")
 
 # SmartAPI object
