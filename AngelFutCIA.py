@@ -122,7 +122,7 @@ def initializeSymbolTokenMap():
     token_df = pd.DataFrame.from_dict(d)
     token_df['expiry'] = pd.to_datetime(token_df['expiry'])
     token_df = token_df.astype({'strike': float})
-    credentials.TOKEN_MAP = token_df
+    TOKEN_MAP = token_df
 
 def getTokenInfo(symbol):
     df = TOKEN_MAP
@@ -365,7 +365,7 @@ def calculate_weekly_demark_pivots(df):
 
 
 def getExchangeSegment(symbol):
-    df = credentials.TOKEN_MAP
+    df = TOKEN_MAP
     result = df[df['symbol'] == symbol]
     if result.empty:
         return "NSE"  # default fallback
@@ -484,10 +484,10 @@ if __name__ == '__main__':
         print("TOTP_SECRET is missing in credentials. Please add it.")
         exit()
 
-    obj = SmartConnect(api_key=credentials.API_KEY)
+    obj = SmartConnect(api_key=API_KEY)
     try:
         data = obj.generateSession(USER_NAME, PWD, totp)
-        credentials.SMART_API_OBJ = obj
+        SMART_API_OBJ = obj
     except Exception as e:
         print(f"Login failed: {str(e)}")
         exit()
