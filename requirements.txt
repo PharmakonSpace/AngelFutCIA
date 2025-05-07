@@ -8,3 +8,4 @@ pandas
 pyotp
 pytz
 setuptools
+pycryptodome>=3.19.0
