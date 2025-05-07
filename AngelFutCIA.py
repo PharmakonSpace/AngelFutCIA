@@ -22,6 +22,10 @@ import logging
 import subprocess
 from google.oauth2.service_account import Credentials
 import json
+from dotenv import load_dotenv
+# Load environment variables from .env file
+load_dotenv()
+
 # Run Angelmasterlist.py
 script_dir = os.path.dirname(os.path.abspath(__file__))
 angel_script = os.path.join(script_dir, "Angelmasterlist.py")
