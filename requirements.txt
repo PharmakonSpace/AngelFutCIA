@@ -14,5 +14,4 @@ openpyxl
 logzero
 websocket-client
 numpy==1.23.5
-TA-Lib
-
+ta-lib
