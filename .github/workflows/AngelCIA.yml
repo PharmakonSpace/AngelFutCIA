@@ -54,10 +54,23 @@ jobs:
       - name: Debug environment variables
         run: env | grep -E 'client_id|APP_TYPE|secret_key|fyers_id|TOTP_KEY|pin|redirect_uri'
 
-      - name: Install dependencies
+      - name: Install TA-Lib C library (required before Python ta-lib)
         run: |
-          pip install --no-cache-dir -r requirements.txt
-          pip install pyotp  # Ensure pyotp is installed
+          sudo apt-get update
+          sudo apt-get install -y wget build-essential
+          wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
+          tar -xzvf ta-lib-0.4.0-src.tar.gz
+          cd ta-lib
+          ./configure --prefix=/usr
+          make
+          sudo make install
+      
+      - name: Install Python dependencies
+        run: |
+          pip install numpy
+          pip install ta-lib
+          pip install -r requirements.txt
+
 
       - name: Debug installed packages
         run: pip list
