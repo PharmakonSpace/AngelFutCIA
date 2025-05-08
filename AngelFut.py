@@ -1,4 +1,4 @@
-from SmartApi import SmartConnect
+from smartapi import SmartConnect
 import pandas as pd
 import pandas_ta as ta
 import ta
@@ -434,8 +434,12 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     # ✅ Ensure correct market hours: 9:15 AM - 3:30 PM IST
     today_ist = datetime.now(IST_TZ)
     to_date = today_ist.replace(hour=15, minute=30, second=0, microsecond=0)
-    from_date = to_date - timedelta(days=15)
+    
+    # Reduce the data range to 7 days to avoid timeouts/limits
+    from_date = to_date - timedelta(days=7)
 
+    # Format date strings according to Angel API requirements
+    # Format should be YYYY-MM-DD HH:MM with leading zeros
     from_date_format = from_date.strftime("%Y-%m-%d 09:15")
     to_date_format = to_date.strftime("%Y-%m-%d 15:30")
 
@@ -444,7 +448,15 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     if not token or pd.isna(token):
         print(f"❌ Error: Invalid token ({token}) for {symbol}")
         return None
+        
     exchange = getExchangeSegment(symbol)
+    
+    # Verify SMART_API_OBJ is authenticated before proceeding
+    global SMART_API_OBJ
+    if SMART_API_OBJ is None:
+        print("❌ API client not initialized")
+        return None
+        
     for attempt in range(3):
         try:
             historicParam = {
@@ -457,9 +469,19 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
 
             response = SMART_API_OBJ.getCandleData(historicParam)
 
+            # Check for authentication errors
+            if response and isinstance(response, dict) and response.get('message') == 'Invalid Token':
+                print(f"🔑 Session expired. Attempting to reconnect...")
+                if reconnect_api():
+                    print(f"🔄 Retrying request after reconnection for {symbol}")
+                    response = SMART_API_OBJ.getCandleData(historicParam)
+                else:
+                    print(f"❌ Could not reconnect. Aborting request for {symbol}")
+                    return None
+
             if not response or 'data' not in response or not response['data']:
                 print(f"⚠️ API returned empty data for {symbol}. Retrying... (Attempt {attempt + 1}/3)")
-                sleep(2)
+                sleep(5)  # Increase sleep time to avoid rate limits
                 continue
 
             df = pd.DataFrame(response['data'], columns=['timestamp', 'O', 'H', 'L', 'C', 'V'])
@@ -481,6 +503,27 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     return None
 
 
+def reconnect_api():
+    """Reconnect to the Angel One API when the session expires."""
+    print("🔄 Attempting to reconnect to Angel One API...")
+    
+    try:
+        totp = pyotp.TOTP(TOTP_SECRET).now()
+        obj = SmartConnect(api_key=API_KEY)
+        data = obj.generateSession(USER_NAME, PWD, totp)
+        
+        if data.get('status'):
+            global SMART_API_OBJ
+            SMART_API_OBJ = obj
+            print("✅ Successfully reconnected to API")
+            return True
+        else:
+            print(f"❌ Reconnection failed: {data.get('message')}")
+            return False
+    except Exception as e:
+        print(f"❌ Reconnection failed with exception: {str(e)}")
+        return False
+
 if __name__ == '__main__':
     # Check if environment variables are properly loaded
     required_env_vars = ['API_KEY', 'USER_NAME', 'PWD', 'TOTP_SECRET']
@@ -495,6 +538,7 @@ if __name__ == '__main__':
 
     try:
         totp = pyotp.TOTP(TOTP_SECRET).now()
+        print(f"✅ Generated TOTP: {totp}")
     except Exception as e:
         print(f"❌ TOTP generation failed: {str(e)}")
         exit(1)
@@ -502,7 +546,19 @@ if __name__ == '__main__':
     obj = SmartConnect(api_key=API_KEY)
     try:
         data = obj.generateSession(USER_NAME, PWD, totp)
+        refresh_token = data['data']['refreshToken']
         SMART_API_OBJ = obj
+        
+        # Check if session was successfully created
+        if data['status'] != True:
+            print(f"❌ Session generation failed: {data['message']}")
+            exit(1)
+            
+        print(f"✅ Login successful. Session token generated.")
+        
+        # Fetch user profile to verify login
+        user_profile = obj.getProfile(refresh_token)
+        print(f"✅ Authenticated as: {user_profile['data']['name']}")
     except Exception as e:
         print(f"❌ Login failed: {str(e)}")
         exit(1)
