@@ -121,8 +121,8 @@ def initializeSymbolTokenMap():
     TOKEN_MAP = token_df
     
 def getTokenInfo(symbol):
-    global TOKEN_MAP
-    result = TOKEN_MAP[TOKEN_MAP['symbol'] == symbol]
+    df = TOKEN_MAP
+    result = df[df['symbol'] == symbol]
 
     if result.empty:
         print(f"⚠️ Token not found for {symbol}")
