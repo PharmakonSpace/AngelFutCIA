@@ -599,7 +599,7 @@ if __name__ == '__main__':
     obj = SmartConnect(api_key=API_KEY)
     try:
         # Use PWD instead of password
-        data = obj.generateSessionByPWD(USER_NAME, PWD, totp)
+        data = obj.generateSession(USER_NAME, PWD, totp)
         
         if not data or not isinstance(data, dict):
             logger.error("❌ Authentication failed: Invalid response format")
