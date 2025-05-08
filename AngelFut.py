@@ -24,51 +24,107 @@ from google.oauth2.service_account import Credentials
 import json
 from dotenv import load_dotenv
 # Load environment variables from .env file
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("angel_script.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file
 load_dotenv()
 
-# Smart API credentials from .env
-#USER_NAME = os.getenv("USER_NAME")
-#API_KEY = os.getenv("API_KEY")
-#PWD = os.getenv("PWD")
-#TOTP_SECRET = os.getenv("TOTP_SECRET")
-#SMART_API_OBJ= os.getenv("SMART_API_OBJ")
-#TOKEN_MAP =  os.getenv("TOKEN_MAP")
-# Run Angelmasterlist.py
 # Fetch credentials and Sheet ID from environment variables
 credentials_json = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
-SHEET_ID =  os.getenv ('SHEET_ID')
+SHEET_ID = os.getenv('SHEET_ID')
 
 if not credentials_json:
+    logger.error("❌ GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
     raise ValueError("GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
 
 # Authenticate using the JSON string from environment
-credentials_info = json.loads(credentials_json)
-credentialsg = Credentials.from_service_account_info(
-    credentials_info,
-    scopes=["https://www.googleapis.com/auth/spreadsheets"]
-)
-client = gspread.authorize(credentialsg)
+try:
+    credentials_info = json.loads(credentials_json)
+    credentialsg = Credentials.from_service_account_info(
+        credentials_info,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
+    client = gspread.authorize(credentialsg)
 
-# Open the Google Sheet by ID
-sheet = client.open_by_key(SHEET_ID)
+    # Open the Google Sheet by ID
+    sheet = client.open_by_key(SHEET_ID)
+    logger.info(f"✅ Successfully connected to Google Sheet: {sheet.title}")
+except Exception as e:
+    logger.error(f"❌ Failed to connect to Google Sheets: {str(e)}")
+    raise
 
-# Function to update data in a Google Sheet tab
+# Function to update data in a Google Sheet tab with better error handling
 def upload_to_sheets(df, tab_name):
+    """
+    Upload a dataframe to a specified tab in Google Sheets
+    with robust error handling and debugging
+    """
+    if df is None or df.empty:
+        logger.error(f"❌ Cannot upload empty dataframe to '{tab_name}'")
+        return False
+        
     try:
+        # Log dataframe info for debugging
+        logger.info(f"📊 Uploading dataframe with shape {df.shape} to '{tab_name}'")
+        logger.info(f"📊 Columns: {df.columns.tolist()}")
+        
         # Replace problematic values with empty strings or a placeholder
         df_clean = df.replace([float('inf'), float('-inf')], None)
         df_clean = df_clean.fillna('')  # or use a placeholder like 'NA'
+        
+        # Handle large datasets - Google Sheets has limits
+        if df_clean.shape[0] > 40000:
+            logger.warning(f"⚠️ Dataframe too large ({df_clean.shape[0]} rows), truncating to 40000 rows.")
+            df_clean = df_clean.head(40000)
 
         try:
+            # Try to get existing worksheet
             worksheet = sheet.worksheet(tab_name)
+            logger.info(f"✅ Found existing tab '{tab_name}'")
         except gspread.exceptions.WorksheetNotFound:
-            worksheet = sheet.add_worksheet(title=tab_name, rows="100", cols="20")
+            # Create new worksheet if it doesn't exist
+            worksheet = sheet.add_worksheet(title=tab_name, rows=max(100, df_clean.shape[0]+10), 
+                                            cols=max(20, df_clean.shape[1]+5))
+            logger.info(f"✅ Created new tab '{tab_name}'")
 
+        # Clear existing content
         worksheet.clear()
-        worksheet.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
-        print(f"✅ Data uploaded to '{tab_name}' tab.")
+        
+        # Prepare data for upload (headers + values)
+        upload_data = [df_clean.columns.values.tolist()] + df_clean.values.tolist()
+        
+        # Update in chunks if necessary (Google Sheets API limits)
+        chunk_size = 5000  # Adjust based on API limits
+        
+        if len(upload_data) <= chunk_size:
+            worksheet.update(upload_data)
+        else:
+            logger.info(f"📊 Breaking upload into chunks due to large size")
+            # Upload header row first
+            worksheet.update([upload_data[0]])
+            
+            # Upload data in chunks
+            for i in range(1, len(upload_data), chunk_size):
+                chunk = upload_data[i:i+chunk_size]
+                worksheet.append_rows(chunk)
+                logger.info(f"📊 Uploaded chunk {i//chunk_size + 1} of {(len(upload_data)//chunk_size) + 1}")
+                time.sleep(1)  # Prevent rate limiting
+        
+        logger.info(f"✅ Data successfully uploaded to '{tab_name}' tab.")
+        return True
+        
     except Exception as e:
-        print(f"❌ Google Sheet error for {tab_name}: {e}")
+        logger.error(f"❌ Google Sheet error for {tab_name}: {str(e)}")
+        return False
         
 script_dir = os.path.dirname(os.path.abspath(__file__))
 angel_script = os.path.join(script_dir, "Angelmasterlist.py")
