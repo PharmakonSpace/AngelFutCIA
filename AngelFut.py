@@ -57,6 +57,7 @@ symbol_queue = queue.Queue()
 all_data = []
 TOKEN_MAP = None  # Will be initialized with token mapping data
 SMART_API_OBJ= None
+
 def fetch_data(symbol):
     """Fetch historical data with retry handling and token validation."""
     token = getTokenInfo(symbol)
@@ -113,13 +114,12 @@ OUTPUT_FILE = "AngelFutCIA.csv"
 def initializeSymbolTokenMap():
     url = 'https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json'
     d = requests.get(url).json()
-    global TOKEN_MAP
     global token_df
     token_df = pd.DataFrame.from_dict(d)
     token_df['expiry'] = pd.to_datetime(token_df['expiry'])
     token_df = token_df.astype({'strike': float})
     TOKEN_MAP = token_df
-    
+
 def getTokenInfo(symbol):
     df = TOKEN_MAP
     result = df[df['symbol'] == symbol]
@@ -129,6 +129,7 @@ def getTokenInfo(symbol):
         return None
 
     return result.iloc[0]['token']
+
     
 
 def calculate_indicators(df, symbol):
