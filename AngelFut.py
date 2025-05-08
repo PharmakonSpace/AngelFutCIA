@@ -31,6 +31,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Fetch credentials and Sheet ID from environment variables
 SHEET_ID = "1IUChF0UFKMqVLxTI69lXBi-g48f-oTYqI1K9miipKgY"
+GOOGLE_SHEETS_CREDENTIALS= os.getenv("GOOGLE_SHEETS_CREDENTIALS_JSON")
 
 def authenticate_google_sheets():
     """Authenticate and return Google Sheets client."""
@@ -63,30 +64,22 @@ def flatten_data(value):
     else:
         return value
 
-def upload_to_google_sheets(dataframe, tab_name, spreadsheet_id, credentials_file):
+def upload_to_google_sheets(df, sheet_name, spreadsheet_id, credentials_json):
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        credentials = ServiceAccountCredentials.from_json_keyfile_name(credentials_file, scope)
-        client = gspread.authorize(credentials)
-
-        sheet = client.open_by_key(spreadsheet_id)
-
-        # Check if the worksheet exists, otherwise create it
+        credentialsg = Credentials.from_service_account_info(json.loads(credentials_json), scopes=scope)
+        gc = gspread.authorize(credentialsg)
+        sh = gc.open_by_key(spreadsheet_id)
         try:
-            worksheet = sheet.worksheet(tab_name)
-            worksheet.clear()
+            worksheet = sh.worksheet(sheet_name)
         except gspread.exceptions.WorksheetNotFound:
-            worksheet = sheet.add_worksheet(title=tab_name, rows="1000", cols="20")
+            worksheet = sh.add_worksheet(title=sheet_name, rows="100", cols="20")
 
-        # Convert all cells in the DataFrame to flat, serializable strings
-        dataframe = dataframe.applymap(flatten_data)
-
-        # Upload the DataFrame to the worksheet
-        worksheet.update([dataframe.columns.values.tolist()] + dataframe.values.tolist())
-
-        logging.info(f"Data uploaded to '{tab_name}' successfully.")
+        worksheet.clear()
+        worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+        print(f"{sheet_name} Data uploaded to Google Sheets.")
     except Exception as e:
-        logging.error(f"❌ Failed to upload data to Google Sheets: {e}")
+        print(f"Error uploading to Google Sheets: {e}")
         
 
 # Google Sheets Credentials Setup
