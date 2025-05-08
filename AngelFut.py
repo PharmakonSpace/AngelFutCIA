@@ -480,7 +480,7 @@ if __name__ == '__main__':
 
     obj = SmartConnect(api_key=API_KEY)
     try:
-        data = obj.generateSession(USER_NAME, PWD, totp)
+        data = obj.generateSession(USER_NAME, MPIN, totp)
         credentials.SMART_API_OBJ = obj
     except Exception as e:
         print(f"Login failed: {str(e)}")
