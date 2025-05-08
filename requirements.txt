@@ -1,6 +1,6 @@
 bs4
 python-dotenv
-smartapi
+smartapi-python
 gspread
 oauth2client
 pandas
