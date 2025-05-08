@@ -68,14 +68,14 @@ def flatten_data(value):
 
 
 # Function to upload DataFrame to Google Sheets
-def upload_to_google_sheets(df, worksheet):
-    if df.empty:
+def upload_to_google_sheets(final_df, worksheet):
+    if final_df.empty:
         print("No data to upload. Skipping Google Sheets update.")
         return
 
     try:
         # Convert DataFrame to list of lists
-        data = [df.columns.tolist()] + df.astype(str).values.tolist()
+        data = [df.columns.tolist()] + final_df.astype(str).values.tolist()
 
         print("Clearing worksheet before upload...")
         worksheet.clear()
