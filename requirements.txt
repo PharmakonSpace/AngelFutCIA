@@ -1,5 +1,6 @@
 bs4
 python-dotenv
+smartapi-python
 smartapi
 gspread
 oauth2client
@@ -9,7 +10,7 @@ ta
 pyotp
 pytz
 setuptools
-pycryptodome
+pycryptodome>=3.19.0
 openpyxl
 logzero
 websocket-client
