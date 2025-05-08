@@ -471,14 +471,14 @@ if __name__ == '__main__':
     initializeSymbolTokenMap()
 
     try:
-        totp = pyotp.TOTP(credentials.TOTP_SECRET).now()
+        totp = pyotp.TOTP(TOTP_SECRET).now()
     except AttributeError:
         print("TOTP_SECRET is missing in credentials. Please add it.")
         exit()
 
-    obj = SmartConnect(api_key=credentials.API_KEY)
+    obj = SmartConnect(api_key=API_KEY)
     try:
-        data = obj.generateSession(credentials.USER_NAME, credentials.PWD, totp)
+        data = obj.generateSession(USER_NAME, PWD, totp)
         credentials.SMART_API_OBJ = obj
     except Exception as e:
         print(f"Login failed: {str(e)}")
