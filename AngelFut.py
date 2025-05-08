@@ -562,7 +562,7 @@ def reconnect_api():
         obj = SmartConnect(api_key=API_KEY)
         
         # Use PWD instead of password for login
-        data = obj.generateSessionByPWD(USER_NAME, PWD, totp)
+        data = obj.generateSession(USER_NAME, PWD, totp)
         
         if data and isinstance(data, dict) and data.get('status'):
             global SMART_API_OBJ
