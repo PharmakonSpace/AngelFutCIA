@@ -1,4 +1,4 @@
-smartapi-python==1.0.0
+smartapi-python
 pandas==1.5.3
 pandas-ta==0.3.14b0
 ta==0.10.2
