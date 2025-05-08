@@ -9,7 +9,6 @@ pandas-ta
 ta
 pyotp
 pytz
-setuptools
 pycryptodome>=3.19.0
 openpyxl
 logzero
