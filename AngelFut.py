@@ -549,7 +549,7 @@ if __name__ == '__main__':
         final_df['timestamp'] = pd.to_datetime(final_df['timestamp'], utc=True).dt.tz_convert(IST_TZ)
         final_df.to_csv(OUTPUT_FILE, index=False)
         # Convert all datetime columns in final_df to string
-        final_df = df.applymap(flatten_data)
+        final_df = final_df.applymap(flatten_data)
         # Upload the summary data to Google Sheets
         upload_to_google_sheets(final_df, worksheet)
 
