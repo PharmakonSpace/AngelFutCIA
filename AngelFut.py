@@ -1,5 +1,5 @@
 import requests
-from SmartApi import SmartConnect
+from smartapi import SmartConnect
 import pandas as pd
 import pandas_ta as ta
 import ta
