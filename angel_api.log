@@ -1,0 +1,6 @@
+2025-05-08 07:25:27,047 - INFO - ✅ Successfully ran Angelmasterlist.py
+2025-05-08 07:25:27,058 - INFO - Starting data collection process
+2025-05-08 07:25:30,949 - INFO - ✅ Successfully loaded token mapping with 127346 entries
+2025-05-08 07:25:30,967 - INFO - Generated TOTP: 587696
+2025-05-08 07:25:31,692 - ERROR - ❌ Login failed: LoginbyPassword is not allowed. Please switch to Login by MPIN now.
+2025-05-08 07:25:31,693 - ERROR - ❌ Failed to authenticate with Angel API. Exiting.
