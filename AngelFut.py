@@ -531,27 +531,27 @@ def fetch_data_worker():
 def authenticate_angel_api():
     """Authenticate with Angel Broking API."""
     # Fetch credentials from environment variables
-    api_key = os.getenv('API_KEY')
-    user_name = os.getenv('USER_NAME')
-    pwd = os.getenv('PWD')
-    totp_secret = os.getenv('TOTP_SECRET')
+    API_KEY = os.getenv('API_KEY')
+    USER_NAME = os.getenv('USER_NAME')
+    PWD = os.getenv('PWD')
+    TOTP_SECRET = os.getenv('TOTP_SECRET')
     
     # Check if all required environment variables are set
-    if not all([api_key, user_name, pwd, totp_secret]):
+    if not all([API_KEY, USER_NAME, PWD, TOTP_SECRET]):
         logger.error("❌ Missing required environment variables. Please check your .env file.")
         logger.error("Required variables: API_KEY, USER_NAME, PWD, TOTP_SECRET")
         return None
     
     try:
         # Generate TOTP
-        totp = pyotp.TOTP(totp_secret).now()
+        totp = pyotp.TOTP(TOTP_SECRET).now()
         logger.info(f"✅ Generated TOTP")
         
         # Initialize SmartConnect
-        obj = SmartConnect(api_key=api_key)
+        obj = SmartConnect(API_KEY=API_KEY)
         
         # Generate session
-        data = obj.generateSession(user_name, pwd, totp)
+        data = obj.generateSession(USER_NAME, PWD, totp)
         
         if data.get('status'):
             logger.info("✅ Successfully authenticated with Angel API")
