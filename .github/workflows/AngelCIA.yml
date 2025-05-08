@@ -57,7 +57,7 @@ jobs:
      
       - name: Install Python dependencies
         run: |
-          pip install --upgrade pip setuptools wheel
+
           pip install --no-cache-dir numpy
           pip install -r requirements.txt -c constraints.txt
 
