@@ -463,10 +463,10 @@ if __name__ == '__main__':
     initializeSymbolTokenMap()
 
     # Fetch credentials from environment variables
-    API_KEY = os.getenv('ANGEL_API_KEY')
-    USER_NAME = os.getenv('ANGEL_USER_NAME')
-    PWD = os.getenv('ANGEL_PWD')
-    TOTP_SECRET = os.getenv('ANGEL_TOTP_SECRET')
+    API_KEY = os.getenv('API_KEY')
+    USER_NAME = os.getenv('USER_NAME')
+    PWD = os.getenv('PWD')
+    TOTP_SECRET = os.getenv('TOTP_SECRET')
     
     # Check if all required environment variables are set
     if not all([API_KEY, USER_NAME, PWD, TOTP_SECRET]):
