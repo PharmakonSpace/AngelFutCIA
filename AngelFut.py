@@ -505,64 +505,84 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
 
 def reconnect_api():
     """Reconnect to the Angel One API when the session expires."""
-    print("🔄 Attempting to reconnect to Angel One API...")
+    logger.info("🔄 Attempting to reconnect to Angel One API...")
     
     try:
         totp = pyotp.TOTP(TOTP_SECRET).now()
         obj = SmartConnect(api_key=API_KEY)
-        data = obj.generateSession(USER_NAME, PWD, totp)
         
-        if data.get('status'):
+        # Use MPIN instead of password for login
+        data = obj.generateSessionByMPIN(USER_NAME, MPIN, totp)
+        
+        if data and isinstance(data, dict) and data.get('status'):
             global SMART_API_OBJ
             SMART_API_OBJ = obj
-            print("✅ Successfully reconnected to API")
+            logger.info("✅ Successfully reconnected to API")
             return True
         else:
-            print(f"❌ Reconnection failed: {data.get('message')}")
+            error_msg = data.get('message') if data and isinstance(data, dict) else "Unknown error"
+            logger.error(f"❌ Reconnection failed: {error_msg}")
             return False
     except Exception as e:
-        print(f"❌ Reconnection failed with exception: {str(e)}")
+        logger.error(f"❌ Reconnection failed with exception: {str(e)}")
         return False
+
 
 if __name__ == '__main__':
     # Check if environment variables are properly loaded
-    required_env_vars = ['API_KEY', 'USER_NAME', 'PWD', 'TOTP_SECRET']
+    required_env_vars = ['API_KEY', 'USER_NAME', 'MPIN', 'TOTP_SECRET']
     missing_vars = [var for var in required_env_vars if not os.getenv(var)]
     
     if missing_vars:
-        print(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
-        print("Please create a .env file with the required credentials")
+        logger.error(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
+        logger.error("Please create a .env file with the required credentials")
         exit(1)
     
     initializeSymbolTokenMap()
 
     try:
         totp = pyotp.TOTP(TOTP_SECRET).now()
-        print(f"✅ Generated TOTP: {totp}")
+        logger.info(f"✅ Generated TOTP: {totp}")
     except Exception as e:
-        print(f"❌ TOTP generation failed: {str(e)}")
+        logger.error(f"❌ TOTP generation failed: {str(e)}")
         exit(1)
 
     obj = SmartConnect(api_key=API_KEY)
     try:
-        data = obj.generateSession(USER_NAME, PWD, totp)
-        refresh_token = data['data']['refreshToken']
-        SMART_API_OBJ = obj
+        # Use MPIN instead of password
+        data = obj.generateSessionByMPIN(USER_NAME, MPIN, totp)
         
-        # Check if session was successfully created
-        if data['status'] != True:
-            print(f"❌ Session generation failed: {data['message']}")
+        if not data or not isinstance(data, dict):
+            logger.error("❌ Authentication failed: Invalid response format")
             exit(1)
             
-        print(f"✅ Login successful. Session token generated.")
+        if not data.get('status'):
+            logger.error(f"❌ Authentication failed: {data.get('message', 'Unknown error')}")
+            exit(1)
+        
+        refresh_token = data.get('data', {}).get('refreshToken')
+        if not refresh_token:
+            logger.error("❌ No refresh token in response")
+            exit(1)
+            
+        SMART_API_OBJ = obj
+        logger.info(f"✅ Login successful. Session token generated.")
         
         # Fetch user profile to verify login
-        user_profile = obj.getProfile(refresh_token)
-        print(f"✅ Authenticated as: {user_profile['data']['name']}")
+        try:
+            user_profile = obj.getProfile(refresh_token)
+            if user_profile and user_profile.get('data', {}).get('name'):
+                logger.info(f"✅ Authenticated as: {user_profile['data']['name']}")
+            else:
+                logger.warning("⚠️ Authenticated but couldn't retrieve profile name")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not fetch profile: {e}")
+            
     except Exception as e:
-        print(f"❌ Login failed: {str(e)}")
+        logger.error(f"❌ Login failed: {str(e)}")
         exit(1)
 
+   
     # Add symbols to queue
     for symbol in SYMBOL_LIST:
         symbol_queue.put(symbol)
