@@ -54,7 +54,11 @@ jobs:
       - name: Debug environment variables
         run: env | grep -E 'USER_NAME|PWD|TOTP_SECRET|API_KEY|TOKEN_MAP|FEED_TOKEN|SHEET_ID'
 
-     
+      - name: Debug dependency tree
+        run: |
+          pip install pipdeptree
+          pipdeptree
+
       - name: Install Python dependencies
         run: |
 
@@ -68,7 +72,7 @@ jobs:
         env:
           GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
         run: python AngelFut.py
-
+   
       - name: Configure Git
         run: |
           git config --global user.name "github-actions"
