@@ -40,13 +40,13 @@ def authenticate_google_sheets():
         raise ValueError("GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
 
     credentials_info = json.loads(credentials_json)
-    credentials = Credentials.from_service_account_info(
+    credentialsg = Credentials.from_service_account_info(
         credentials_info,
         scopes=["https://www.googleapis.com/auth/spreadsheets"]
     )
 
     try:
-        client = gspread.authorize(credentials)
+        client = gspread.authorize(credentialsg)
         logging.info("Google Sheets authentication successful.")
         return client
     except Exception as e:
@@ -67,7 +67,7 @@ def flatten_data(value):
 def upload_to_google_sheets(df, sheet_name, spreadsheet_id, credentials_json):
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        credentialsg = Credentials.from_service_account_info(json.loads(credentials_json), scopes=scope)
+        credentialsg = Credentialsg.from_service_account_info(json.loads(credentials_json), scopes=scope)
         gc = gspread.authorize(credentialsg)
         sh = gc.open_by_key(spreadsheet_id)
         try:
