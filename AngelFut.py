@@ -1,11 +1,13 @@
+import requests
 from SmartApi import SmartConnect
 import pandas as pd
 import pandas_ta as ta
 import ta
 from datetime import datetime, timedelta
-import requests
+import credentials
 import numpy as np
 from time import sleep
+#from talib.abstract import RSI, ATR
 import pyotp
 import warnings
 import os
@@ -18,6 +20,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import subprocess
+from google.oauth2.service_account import Credentials
+import json
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
