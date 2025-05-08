@@ -67,7 +67,7 @@ def flatten_data(value):
 def upload_to_google_sheets(df, sheet_name, spreadsheet_id, credentials_json):
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        credentialsg = Credentialsg.from_service_account_info(json.loads(credentials_json), scopes=scope)
+        credentialsg = Credentials.from_service_account_info(json.loads(credentials_json), scopes=scope)
         gc = gspread.authorize(credentialsg)
         sh = gc.open_by_key(spreadsheet_id)
         try:
