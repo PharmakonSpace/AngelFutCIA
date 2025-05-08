@@ -1,12 +1,13 @@
+import requests
 from SmartApi import SmartConnect
 import pandas as pd
 import pandas_ta as ta
 import ta
 from datetime import datetime, timedelta
-#import credentials
-import requests
+import credentials
 import numpy as np
 from time import sleep
+#from talib.abstract import RSI, ATR
 import pyotp
 import warnings
 import os
@@ -19,17 +20,56 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import subprocess
+from google.oauth2.service_account import Credentials
+import json
 from dotenv import load_dotenv
-
+# Load environment variables from .env file
 load_dotenv()
 
-API_KEY = os.getenv("API_KEY")
+# Smart API credentials from .env
 USER_NAME = os.getenv("USER_NAME")
+API_KEY = os.getenv("API_KEY")
 PWD = os.getenv("PWD")
 TOTP_SECRET = os.getenv("TOTP_SECRET")
-TOKEN_MAP = None
-SMART_API_OBJ = None
+SMART_API_OBJ= os.getenv("SMART_API_OBJ")
+TOKEN_MAP =  os.getenv("TOKEN_MAP")
 # Run Angelmasterlist.py
+# Fetch credentials and Sheet ID from environment variables
+credentials_json = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
+SHEET_ID =  os.getenv ('SHEET_ID')
+
+if not credentials_json:
+    raise ValueError("GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
+
+# Authenticate using the JSON string from environment
+credentials_info = json.loads(credentials_json)
+credentials = Credentials.from_service_account_info(
+    credentials_info,
+    scopes=["https://www.googleapis.com/auth/spreadsheets"]
+)
+client = gspread.authorize(credentials)
+
+# Open the Google Sheet by ID
+sheet = client.open_by_key(SHEET_ID)
+
+# Function to update data in a Google Sheet tab
+def upload_to_sheets(df, tab_name):
+    try:
+        # Replace problematic values with empty strings or a placeholder
+        df_clean = df.replace([float('inf'), float('-inf')], None)
+        df_clean = df_clean.fillna('')  # or use a placeholder like 'NA'
+
+        try:
+            worksheet = sheet.worksheet(tab_name)
+        except gspread.exceptions.WorksheetNotFound:
+            worksheet = sheet.add_worksheet(title=tab_name, rows="100", cols="20")
+
+        worksheet.clear()
+        worksheet.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
+        print(f"✅ Data uploaded to '{tab_name}' tab.")
+    except Exception as e:
+        print(f"❌ Google Sheet error for {tab_name}: {e}")
+        
 script_dir = os.path.dirname(os.path.abspath(__file__))
 angel_script = os.path.join(script_dir, "Angelmasterlist.py")
 
@@ -112,20 +152,16 @@ warnings.filterwarnings('ignore')
 OUTPUT_FILE = "AngelFutCIA.csv"
 
 def initializeSymbolTokenMap():
-    global TOKEN_MAP
-
     url = 'https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json'
     d = requests.get(url).json()
     global token_df
     token_df = pd.DataFrame.from_dict(d)
     token_df['expiry'] = pd.to_datetime(token_df['expiry'])
     token_df = token_df.astype({'strike': float})
-    TOKEN_MAP = token_df
+    credentials.TOKEN_MAP = token_df
 
 def getTokenInfo(symbol):
-    global TOKEN_MAP
-
-    df = TOKEN_MAP
+    df = credentials.TOKEN_MAP
     result = df[df['symbol'] == symbol]
 
     if result.empty:
@@ -188,7 +224,7 @@ def calculate_chaikin_volatility(df, ema_period=10, change_period=10):
     hl_range = df['high'] - df['low']
     ema_hl = hl_range.ewm(span=ema_period, adjust=False).mean()
 
-    # Step 2: % change over `change_period` days
+    # Step 2: % change over change_period days
     chaikin_volatility = ema_hl.pct_change(periods=change_period) * 100
 
     df['ChaikinVolatility'] = chaikin_volatility.fillna(0)
@@ -365,9 +401,7 @@ def calculate_weekly_demark_pivots(df):
 
 
 def getExchangeSegment(symbol):
-    global TOKEN_MAP
-
-    df = TOKEN_MAP
+    df = credentials.TOKEN_MAP
     result = df[df['symbol'] == symbol]
     if result.empty:
         return "NSE"  # default fallback
@@ -450,9 +484,8 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
             "fromdate": from_date_format,
             "todate": to_date_format
         }
-            global SMART_API_OBJ
 
-            response = SMART_API_OBJ.getCandleData(historicParam)
+            response = credentials.SMART_API_OBJ.getCandleData(historicParam)
 
             if not response or 'data' not in response or not response['data']:
                 print(f"⚠️ API returned empty data for {symbol}. Retrying... (Attempt {attempt + 1}/3)")
@@ -480,18 +513,17 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
 
 if __name__ == '__main__':
     initializeSymbolTokenMap()
-    
+
     try:
-        totp = pyotp.TOTP(TOTP_SECRET).now()
+        totp = pyotp.TOTP(credentials.TOTP_SECRET).now()
     except AttributeError:
         print("TOTP_SECRET is missing in credentials. Please add it.")
         exit()
 
-    obj = SmartConnect(api_key=API_KEY)
+    obj = SmartConnect(api_key=credentials.API_KEY)
     try:
-        data = obj.generateSession(USER_NAME, PWD, totp)
-        
-        SMART_API_OBJ = obj
+        data = obj.generateSession(credentials.USER_NAME, credentials.PWD, totp)
+        credentials.SMART_API_OBJ = obj
     except Exception as e:
         print(f"Login failed: {str(e)}")
         exit()
