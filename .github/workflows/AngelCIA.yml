@@ -59,7 +59,7 @@ jobs:
         run: |
           pip install --upgrade pip setuptools wheel
           pip install --no-cache-dir numpy
-          pip install --no-cache-dir -r requirements.txt
+          pip install -r requirements.txt -c constraints.txt
 
       - name: Debug installed packages
         run: pip list
