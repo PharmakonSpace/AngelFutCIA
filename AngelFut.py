@@ -23,19 +23,61 @@ import subprocess
 from google.oauth2.service_account import Credentials
 import json
 from dotenv import load_dotenv
-
-#Load environment variables from .env file
+# Load environment variables from .env file
 load_dotenv()
 
 # Smart API credentials from .env
-USER_NAME = os.getenv("USER_NAME")
-API_KEY = os.getenv("API_KEY")
-PWD = os.getenv("PWD")
-MPIN = os.getenv("MPIN")
-TOTP_SECRET = os.getenv("TOTP_SECRET")
-SMART_API_OBJ= os.getenv("SMART_API_OBJ")
-TOKEN_MAP =  os.getenv("TOKEN_MAP")
+#USER_NAME = os.getenv("USER_NAME")
+#API_KEY = os.getenv("API_KEY")
+#PWD = os.getenv("PWD")
+#TOTP_SECRET = os.getenv("TOTP_SECRET")
+#SMART_API_OBJ= os.getenv("SMART_API_OBJ")
+#TOKEN_MAP =  os.getenv("TOKEN_MAP")
 # Run Angelmasterlist.py
+# Fetch credentials and Sheet ID from environment variables
+credentials_json = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
+SHEET_ID =  os.getenv ('SHEET_ID')
+
+if not credentials_json:
+    raise ValueError("GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
+
+# Authenticate using the JSON string from environment
+credentials_info = json.loads(credentials_json)
+credentials = Credentials.from_service_account_info(
+    credentials_info,
+    scopes=["https://www.googleapis.com/auth/spreadsheets"]
+)
+client = gspread.authorize(credentials)
+
+# Open the Google Sheet by ID
+sheet = client.open_by_key(SHEET_ID)
+
+# Function to update data in a Google Sheet tab
+def upload_to_sheets(df, tab_name):
+    try:
+        # Replace problematic values with empty strings or a placeholder
+        df_clean = df.replace([float('inf'), float('-inf')], None)
+        df_clean = df_clean.fillna('')  # or use a placeholder like 'NA'
+
+        try:
+            worksheet = sheet.worksheet(tab_name)
+        except gspread.exceptions.WorksheetNotFound:
+            worksheet = sheet.add_worksheet(title=tab_name, rows="100", cols="20")
+
+        worksheet.clear()
+        worksheet.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
+        print(f"✅ Data uploaded to '{tab_name}' tab.")
+    except Exception as e:
+        print(f"❌ Google Sheet error for {tab_name}: {e}")
+        
+script_dir = os.path.dirname(os.path.abspath(__file__))
+angel_script = os.path.join(script_dir, "Angelmasterlist.py")
+
+try:
+    subprocess.run(["python", angel_script], check=True)
+except subprocess.CalledProcessError as e:
+    print(f"❌ Failed to run Angelmasterlist.py: {e}")
+    exit()
 
 # Google Sheets Credentials Setup
 def fetch_symbols_from_csv(file_path="Angel_MasterList.csv", column_name="symbol"):
@@ -473,14 +515,14 @@ if __name__ == '__main__':
     initializeSymbolTokenMap()
 
     try:
-        totp = pyotp.TOTP(TOTP_SECRET).now()
+        totp = pyotp.TOTP(credentials.TOTP_SECRET).now()
     except AttributeError:
         print("TOTP_SECRET is missing in credentials. Please add it.")
         exit()
 
-    obj = SmartConnect(api_key=API_KEY)
+    obj = SmartConnect(api_key=credentials.API_KEY)
     try:
-        data = obj.generateSession(USER_NAME, MPIN, totp)
+        data = obj.generateSession(credentials.USER_NAME, credentials.PWD, totp)
         credentials.SMART_API_OBJ = obj
     except Exception as e:
         print(f"Login failed: {str(e)}")
