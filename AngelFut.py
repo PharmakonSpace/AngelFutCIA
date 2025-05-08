@@ -30,28 +30,30 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Fetch credentials and Sheet ID from environment variables
-SHEET_ID = "1IUChF0UFKMqVLxTI69lXBi-g48f-oTYqI1K9miipKgY"
-GOOGLE_SHEETS_CREDENTIALS= os.getenv("GOOGLE_SHEETS_CREDENTIALS")
+credentials_json = os.getenv('GOOGLE_SHEETS_CREDENTIALS')  # JSON string
+SHEET_ID = "17y8FzzvHnc5jgMoS40H1WXxj133PgAcjfxYcXtoGwh4"
+TAB_NAME = "1hrST"  # Define the target sheet/tab name
 
-def authenticate_google_sheets():
-    """Authenticate and return Google Sheets client."""
-    credentials_json = os.getenv('GOOGLE_SHEETS_CREDENTIALS')  # JSON string
-    if not credentials_json:
-        raise ValueError("GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
+if not credentials_json:
+    raise ValueError("GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
 
-    credentials_info = json.loads(credentials_json)
-    credentialsg = Credentials.from_service_account_info(
-        credentials_info,
-        scopes=["https://www.googleapis.com/auth/spreadsheets"]
-    )
+# Authenticate using the JSON string from environment
+credentials_info = json.loads(credentials_json)
+credentials = Credentials.from_service_account_info(
+    credentials_info,
+    scopes=["https://www.googleapis.com/auth/spreadsheets"]
+)
+client = gspread.authorize(credentials)
 
-    try:
-        client = gspread.authorize(credentialsg)
-        logging.info("Google Sheets authentication successful.")
-        return client
-    except Exception as e:
-        logging.error(f"Google Sheets authentication failed: {e}")
-        raise
+# Open the Google Sheet by ID
+sheet = client.open_by_key(SHEET_ID)
+
+# Check if "LOC" tab exists, if not, create it
+try:
+    worksheet = sheet.worksheet(TAB_NAME)
+except gspread.exceptions.WorksheetNotFound:
+    worksheet = sheet.add_worksheet(title=TAB_NAME, rows="100", cols="20")  # Adjust size as needed
+
 
 # Flatten any nested structures for uploading to Google Sheets
 def flatten_data(value):
@@ -64,35 +66,26 @@ def flatten_data(value):
     else:
         return value
 
-def upload_to_google_sheets(df, sheet_name, spreadsheet_id, credentials_json):
-    try:
-        # Authenticate with Google Sheets API
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        credentialsg = Credentials.from_service_account_info(json.loads(credentials_json), scopes=scope)
-        gc = gspread.authorize(credentialsg)
 
-        # Open the spreadsheet by ID
-        sh = gc.open_by_key(spreadsheet_id)
-        
-        try:
-            # Attempt to access the worksheet, create it if it does not exist
-            worksheet = sh.worksheet(sheet_name)
-        except gspread.exceptions.WorksheetNotFound:
-            print(f"⚠️ Worksheet '{sheet_name}' not found. Creating a new worksheet.")
-            worksheet = sh.add_worksheet(title=sheet_name, rows="100", cols="20")
-        
-        # Clear the existing data in the worksheet
+# Function to upload DataFrame to Google Sheets
+def upload_to_google_sheets(df, worksheet):
+    if df.empty:
+        print("No data to upload. Skipping Google Sheets update.")
+        return
+
+    try:
+        # Convert DataFrame to list of lists
+        data = [df.columns.tolist()] + df.astype(str).values.tolist()
+
+        print("Clearing worksheet before upload...")
         worksheet.clear()
 
-        # Prepare the data to be uploaded (flatten any nested structures first)
-        data_to_upload = [df.columns.values.tolist()] + df.applymap(flatten_data).values.tolist()
-
-        # Upload the data to the worksheet
-        worksheet.update(data_to_upload)
-
-        print(f"✅ Data uploaded to sheet '{sheet_name}' successfully.")
+        print("Uploading data to Google Sheets...")
+        worksheet.update(data)
+        
+        print(f"Data successfully uploaded to Google Sheets - Tab: {TAB_NAME}")
     except Exception as e:
-        print(f"❌ Error uploading to Google Sheets: {e}")
+        print(f"Error uploading to Google Sheets: {e}")
 
         
 
@@ -558,7 +551,7 @@ if __name__ == '__main__':
         # Convert all datetime columns in final_df to string
         final_df = df.applymap(flatten_data)
         # Upload the summary data to Google Sheets
-        upload_to_google_sheets(final_df, "1hrST", SHEET_ID, GOOGLE_SHEETS_CREDENTIALS)
+        upload_to_google_sheets(final_df, worksheet)
 
         print(f"✅ Data saved to {OUTPUT_FILE}")
 
