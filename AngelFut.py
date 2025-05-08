@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import credentials
 import numpy as np
 from time import sleep
-#from talib.abstract import RSI, ATR
+from datetime import datetime
 import pyotp
 import warnings
 import os
@@ -76,7 +76,7 @@ def upload_to_google_sheets(sheet_id, tab_name, dataframe):
         logging.info(f"Worksheet '{tab_name}' not found. Created a new one.")
 
     # Flatten the entire dataframe (one pass)
-    dataframe = dataframe.apply(lambda x: flatten_data(x))  # New line using lambda
+    dataframe = dataframe.applymap(flatten_data)
 
     # Update worksheet with DataFrame data
     worksheet.update([dataframe.columns.values.tolist()] + dataframe.values.tolist())
