@@ -22,9 +22,9 @@ import logging
 import subprocess
 from google.oauth2.service_account import Credentials
 import json
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 # Load environment variables from .env file
-load_dotenv()
+#load_dotenv()
 
 # Smart API credentials from .env
 USER_NAME = os.getenv("USER_NAME")
