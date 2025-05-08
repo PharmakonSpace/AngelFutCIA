@@ -75,7 +75,7 @@ def upload_to_google_sheets(final_df, worksheet):
 
     try:
         # Convert DataFrame to list of lists
-        data = [df.columns.tolist()] + final_df.astype(str).values.tolist()
+        data = [final_df.columns.tolist()] + final_df.astype(str).values.tolist()
 
         print("Clearing worksheet before upload...")
         worksheet.clear()
