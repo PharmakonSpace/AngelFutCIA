@@ -45,7 +45,7 @@ except subprocess.CalledProcessError as e:
 # Access credentials from environment variables
 API_KEY = os.getenv('API_KEY')
 USER_NAME = os.getenv('USER_NAME')
-MPIN = os.getenv('MPIN')  # Changed from PWD to MPIN
+PWD = os.getenv('PWD')  # Changed from PWD to PWD
 TOTP_SECRET = os.getenv('TOTP_SECRET')
 
 # Global variables
@@ -561,8 +561,8 @@ def reconnect_api():
         totp = pyotp.TOTP(TOTP_SECRET).now()
         obj = SmartConnect(api_key=API_KEY)
         
-        # Use MPIN instead of password for login
-        data = obj.generateSessionByMPIN(USER_NAME, MPIN, totp)
+        # Use PWD instead of password for login
+        data = obj.generateSessionByPWD(USER_NAME, PWD, totp)
         
         if data and isinstance(data, dict) and data.get('status'):
             global SMART_API_OBJ
@@ -579,7 +579,7 @@ def reconnect_api():
 
 if __name__ == '__main__':
     # Check if environment variables are properly loaded
-    required_env_vars = ['API_KEY', 'USER_NAME', 'MPIN', 'TOTP_SECRET']
+    required_env_vars = ['API_KEY', 'USER_NAME', 'PWD', 'TOTP_SECRET']
     missing_vars = [var for var in required_env_vars if not os.getenv(var)]
     
     if missing_vars:
@@ -598,8 +598,8 @@ if __name__ == '__main__':
 
     obj = SmartConnect(api_key=API_KEY)
     try:
-        # Use MPIN instead of password
-        data = obj.generateSessionByMPIN(USER_NAME, MPIN, totp)
+        # Use PWD instead of password
+        data = obj.generateSessionByPWD(USER_NAME, PWD, totp)
         
         if not data or not isinstance(data, dict):
             logger.error("❌ Authentication failed: Invalid response format")
