@@ -64,22 +64,36 @@ def flatten_data(value):
     else:
         return value
 
-def upload_to_google_sheets(df, sheet_name, spreadsheet_id, credentials_json):
+ddef upload_to_google_sheets(df, sheet_name, spreadsheet_id, credentials_json):
     try:
+        # Authenticate with Google Sheets API
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         credentialsg = Credentials.from_service_account_info(json.loads(credentials_json), scopes=scope)
         gc = gspread.authorize(credentialsg)
+
+        # Open the spreadsheet by ID
         sh = gc.open_by_key(spreadsheet_id)
+        
         try:
+            # Attempt to access the worksheet, create it if it does not exist
             worksheet = sh.worksheet(sheet_name)
         except gspread.exceptions.WorksheetNotFound:
+            print(f"⚠️ Worksheet '{sheet_name}' not found. Creating a new worksheet.")
             worksheet = sh.add_worksheet(title=sheet_name, rows="100", cols="20")
-
+        
+        # Clear the existing data in the worksheet
         worksheet.clear()
-        worksheet.update([df.columns.values.tolist()] + df.values.tolist())
-        print(f"{sheet_name} Data uploaded to Google Sheets.")
+
+        # Prepare the data to be uploaded (flatten any nested structures first)
+        data_to_upload = [df.columns.values.tolist()] + df.applymap(flatten_data).values.tolist()
+
+        # Upload the data to the worksheet
+        worksheet.update(data_to_upload)
+
+        print(f"✅ Data uploaded to sheet '{sheet_name}' successfully.")
     except Exception as e:
-        print(f"Error uploading to Google Sheets: {e}")
+        print(f"❌ Error uploading to Google Sheets: {e}")
+
         
 
 # Google Sheets Credentials Setup
