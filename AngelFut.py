@@ -31,7 +31,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Fetch credentials and Sheet ID from environment variables
 SHEET_ID = "1IUChF0UFKMqVLxTI69lXBi-g48f-oTYqI1K9miipKgY"
-GOOGLE_SHEETS_CREDENTIALS= os.getenv("GOOGLE_SHEETS_CREDENTIALS_JSON")
+GOOGLE_SHEETS_CREDENTIALS= os.getenv("GOOGLE_SHEETS_CREDENTIALS")
 
 def authenticate_google_sheets():
     """Authenticate and return Google Sheets client."""
