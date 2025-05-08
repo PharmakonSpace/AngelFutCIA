@@ -119,26 +119,26 @@ def authenticate_api():
     global SMART_API_OBJ
     
     # Fetch credentials
-   API_KEY = os.getenv('API_KEY')
-    USER_NAME' = os.getenv('USER_NAME'')
-    PSW = os.getenv('PWD')
-    TOTP_SECRET = os.getenv('TOTP_SECRET')
+    api_key = os.getenv('API_KEY')
+    user_name = os.getenv('USER_NAME')
+    password = os.getenv('PWD')
+    totp_secret = os.getenv('TOTP_SECRET')
     
     # Validate credentials
-    if not all([api_key, USER_NAME', PSW, TOTP_SECRET]):
+    if not all([api_key, user_name, password, totp_secret]):
         logger.error("Missing required environment variables. Check your .env file.")
         return False
     
     try:
         # Generate TOTP
-        totp = pyotp.TOTP(TOTP_SECRET).now()
+        totp = pyotp.TOTP(totp_secret).now()
         logger.info(f"Generated TOTP for authentication")
         
         # Create SmartConnect object
         obj = SmartConnect(api_key=api_key)
         
         # Generate session
-        data = obj.generateSession(USER_NAME', PSW, totp)
+        data = obj.generateSession(user_name, password, totp)
         
         if data.get('status'):
             logger.info("Authentication successful")
