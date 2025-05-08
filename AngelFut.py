@@ -53,43 +53,41 @@ def authenticate_google_sheets():
         raise
 
 # Flatten any nested structures for uploading to Google Sheets
-def flatten_data(data):
-    """Flatten nested data (list or dictionary) to strings."""
-    if isinstance(data, dict):
-        return {key: str(value) for key, value in data.items()}  # Convert dict to string
-    elif isinstance(data, list):
-        return [str(item) if not isinstance(item, (dict, list)) else str(item) for item in data]  # Flatten lists
-    return data  # If data is already simple, return it unchanged
+def flatten_data(value):
+    if isinstance(value, (list, dict)):
+        return json.dumps(value)
+    elif isinstance(value, pd.Timestamp):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    elif isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        return value
 
-def upload_to_google_sheets(sheet_id, tab_name, dataframe):
-    """Upload the provided dataframe to a Google Sheet."""
-    client = authenticate_google_sheets()
-    sheet = client.open_by_key(sheet_id)
-
-    # Try to find the worksheet or create a new one
+def upload_to_google_sheets(dataframe, tab_name, spreadsheet_id, credentials_file):
     try:
-        worksheet = sheet.worksheet(tab_name)
-        worksheet.clear()  # Clear existing data
-        logging.info(f"Worksheet '{tab_name}' found, cleared existing data.")
-    except gspread.exceptions.WorksheetNotFound:
-        worksheet = sheet.add_worksheet(title=tab_name, rows=str(len(dataframe) + 1), cols=str(len(dataframe.columns)))
-        logging.info(f"Worksheet '{tab_name}' not found. Created a new one.")
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        credentials = ServiceAccountCredentials.from_json_keyfile_name(credentials_file, scope)
+        client = gspread.authorize(credentials)
 
-    # Flatten the entire dataframe (one pass)
-    dataframe = dataframe.applymap(flatten_data)
+        sheet = client.open_by_key(spreadsheet_id)
 
-    # Update worksheet with DataFrame data
-    worksheet.update([dataframe.columns.values.tolist()] + dataframe.values.tolist())
-    logging.info(f"Data uploaded to '{tab_name}' successfully.")
+        # Check if the worksheet exists, otherwise create it
+        try:
+            worksheet = sheet.worksheet(tab_name)
+            worksheet.clear()
+        except gspread.exceptions.WorksheetNotFound:
+            worksheet = sheet.add_worksheet(title=tab_name, rows="1000", cols="20")
+
+        # Convert all cells in the DataFrame to flat, serializable strings
+        dataframe = dataframe.applymap(flatten_data)
+
+        # Upload the DataFrame to the worksheet
+        worksheet.update([dataframe.columns.values.tolist()] + dataframe.values.tolist())
+
+        logging.info(f"Data uploaded to '{tab_name}' successfully.")
+    except Exception as e:
+        logging.error(f"❌ Failed to upload data to Google Sheets: {e}")
         
-script_dir = os.path.dirname(os.path.abspath(__file__))
-angel_script = os.path.join(script_dir, "Angelmasterlist.py")
-
-try:
-    subprocess.run(["python", angel_script], check=True)
-except subprocess.CalledProcessError as e:
-    print(f"❌ Failed to run Angelmasterlist.py: {e}")
-    exit()
 
 # Google Sheets Credentials Setup
 def fetch_symbols_from_csv(file_path="Angel_MasterList.csv", column_name="symbol"):
