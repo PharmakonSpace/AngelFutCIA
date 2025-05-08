@@ -121,11 +121,11 @@ def authenticate_api():
     # Fetch credentials
     api_key = os.getenv('API_KEY')
     user_name = os.getenv('USER_NAME')
-    password = os.getenv('PWD')
+    PSW = os.getenv('PWD')
     totp_secret = os.getenv('TOTP_SECRET')
     
     # Validate credentials
-    if not all([api_key, user_name, password, totp_secret]):
+    if not all([api_key, user_name, PSW, totp_secret]):
         logger.error("Missing required environment variables. Check your .env file.")
         return False
     
@@ -138,7 +138,7 @@ def authenticate_api():
         obj = SmartConnect(api_key=api_key)
         
         # Generate session
-        data = obj.generateSession(user_name, password, totp)
+        data = obj.generateSession(user_name, PSW, totp)
         
         if data.get('status'):
             logger.info("Authentication successful")
