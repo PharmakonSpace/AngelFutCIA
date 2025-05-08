@@ -1,1 +1,2 @@
-PyCrypto
+PyCrypto==0
+PyCrypt==0
