@@ -39,11 +39,11 @@ if not credentials_json:
 
 # Authenticate using the JSON string from environment
 credentials_info = json.loads(credentials_json)
-credentials = Credentials.from_service_account_info(
+credentialsg = Credentials.from_service_account_info(
     credentials_info,
     scopes=["https://www.googleapis.com/auth/spreadsheets"]
 )
-client = gspread.authorize(credentials)
+client = gspread.authorize(credentialsg)
 
 # Open the Google Sheet by ID
 sheet = client.open_by_key(SHEET_ID)
