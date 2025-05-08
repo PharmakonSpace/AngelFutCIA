@@ -64,7 +64,7 @@ def flatten_data(value):
     else:
         return value
 
-ddef upload_to_google_sheets(df, sheet_name, spreadsheet_id, credentials_json):
+def upload_to_google_sheets(df, sheet_name, spreadsheet_id, credentials_json):
     try:
         # Authenticate with Google Sheets API
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
