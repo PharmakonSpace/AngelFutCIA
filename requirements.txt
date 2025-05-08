@@ -1,6 +1,5 @@
 bs4
 python-dotenv
-smartapi-python==1.4.8
 smartapi
 gspread
 oauth2client
