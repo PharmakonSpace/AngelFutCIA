@@ -583,55 +583,40 @@ if __name__ == '__main__':
     missing_vars = [var for var in required_env_vars if not os.getenv(var)]
     
     if missing_vars:
-        logger.error(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
-        logger.error("Please create a .env file with the required credentials")
+        print(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
+        print("Please create a .env file with the required credentials")
         exit(1)
     
     initializeSymbolTokenMap()
 
     try:
         totp = pyotp.TOTP(TOTP_SECRET).now()
-        logger.info(f"✅ Generated TOTP: {totp}")
+        print(f"✅ Generated TOTP: {totp}")
     except Exception as e:
-        logger.error(f"❌ TOTP generation failed: {str(e)}")
+        print(f"❌ TOTP generation failed: {str(e)}")
         exit(1)
 
     obj = SmartConnect(api_key=API_KEY)
     try:
-        # Use PWD instead of password
         data = obj.generateSession(USER_NAME, PWD, totp)
-        
-        if not data or not isinstance(data, dict):
-            logger.error("❌ Authentication failed: Invalid response format")
-            exit(1)
-            
-        if not data.get('status'):
-            logger.error(f"❌ Authentication failed: {data.get('message', 'Unknown error')}")
-            exit(1)
-        
-        refresh_token = data.get('data', {}).get('refreshToken')
-        if not refresh_token:
-            logger.error("❌ No refresh token in response")
-            exit(1)
-            
+        refresh_token = data['data']['refreshToken']
         SMART_API_OBJ = obj
-        logger.info(f"✅ Login successful. Session token generated.")
+        
+        # Check if session was successfully created
+        if data['status'] != True:
+            print(f"❌ Session generation failed: {data['message']}")
+            exit(1)
+            
+        print(f"✅ Login successful. Session token generated.")
         
         # Fetch user profile to verify login
-        try:
-            user_profile = obj.getProfile(refresh_token)
-            if user_profile and user_profile.get('data', {}).get('name'):
-                logger.info(f"✅ Authenticated as: {user_profile['data']['name']}")
-            else:
-                logger.warning("⚠️ Authenticated but couldn't retrieve profile name")
-        except Exception as e:
-            logger.warning(f"⚠️ Could not fetch profile: {e}")
-            
+        user_profile = obj.getProfile(refresh_token)
+        print(f"✅ Authenticated as: {user_profile['data']['name']}")
     except Exception as e:
-        logger.error(f"❌ Login failed: {str(e)}")
+        print(f"❌ Login failed: {str(e)}")
         exit(1)
 
-      # Add symbols to queue
+    # Add symbols to queue
     for symbol in SYMBOL_LIST:
         symbol_queue.put(symbol)
 
