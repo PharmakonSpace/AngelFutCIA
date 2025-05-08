@@ -56,7 +56,7 @@ MAX_BACKOFF = 30  # Maximum wait time
 symbol_queue = queue.Queue()
 all_data = []
 TOKEN_MAP = None  # Will be initialized with token mapping data
-
+SMART_API_OBJ= None
 def fetch_data(symbol):
     """Fetch historical data with retry handling and token validation."""
     token = getTokenInfo(symbol)
