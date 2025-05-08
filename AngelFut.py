@@ -1,4 +1,4 @@
-from smartapi import SmartConnect
+from SmartApi import SmartConnect
 import pandas as pd
 import pandas_ta as ta
 import ta
