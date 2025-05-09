@@ -88,7 +88,15 @@ def upload_to_google_sheets(final_df, worksheet):
         print(f"Error uploading to Google Sheets: {e}")
 
         
+script_dir = os.path.dirname(os.path.abspath(__file__))
+angel_script = os.path.join(script_dir, "Angelmasterlist.py")
 
+try:
+    subprocess.run(["python", angel_script], check=True)
+except subprocess.CalledProcessError as e:
+    print(f"❌ Failed to run Angelmasterlist.py: {e}")
+    exit()
+    
 # Google Sheets Credentials Setup
 def fetch_symbols_from_csv(file_path="Angel_MasterList.csv", column_name="symbol"):
     try:
