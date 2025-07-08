@@ -1,5 +1,5 @@
 import requests
-from SmartApi import SmartConnect
+from smartapi import SmartConnect
 import pandas as pd
 import pandas_ta as ta
 import ta
@@ -477,6 +477,32 @@ def apply_bull_bear_conditions(df):
     return df
 
 
+def apply_Weekly_conditions(df):
+    required_cols = ['close', 'Supertrend', 'R1_Demark', 'S1_Demark', 'ChaikinVolatility', 'RVI']
+    for col in required_cols:
+        if col not in df.columns:
+            print(f"❌ Missing column '{col}' for bull/bear condition check.")
+            return df
+   
+    # Continuation signals
+    Weekly_Breakout = (
+        (df['close'] > df['prev_high']) &
+        (df['close'].shift(1) < df['prev_high'])
+    )
+
+    Weekly_Breakdown = (
+        (df['close'] < df['prev_close']) &
+        (df['close'].shift(1) > df['prev_close'])
+    )
+
+   
+
+    df.loc[Weekly_Breakout, 'Signal'] = 'Bull'
+    df.loc[Weekly_Breakdown, 'Signal'] = 'Bear'
+
+
+    return df
+
 
 def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     # ✅ Ensure correct market hours: 9:15 AM - 3:30 PM IST
@@ -519,6 +545,7 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
             df = calculate_chaikin_volatility(df)
             df=  calculate_rvi(df)
             df = apply_bull_bear_conditions(df)
+            df = apply_Weekly_conditions(df)
             return df
 
         except Exception as e:
