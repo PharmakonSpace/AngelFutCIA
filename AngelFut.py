@@ -495,7 +495,9 @@ def apply_Weekly_conditions(df):
     )
 
    
-
+     # Initialize signal column
+    df['WeeklySignal'] = 'Neutral' 
+    
     df.loc[Weekly_Breakout, 'Signal'] = 'WeeklyBull'
     df.loc[Weekly_Breakdown, 'Signal'] = 'WeeklyBear'
 
