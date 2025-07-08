@@ -1,5 +1,5 @@
 import requests
-from smartapi import SmartConnect
+from SmartApi import SmartConnect
 import pandas as pd
 import pandas_ta as ta
 import ta
@@ -476,7 +476,6 @@ def apply_bull_bear_conditions(df):
 
     return df
 
-
 def apply_Weekly_conditions(df):
     required_cols = ['close', 'Supertrend', 'R1_Demark', 'S1_Demark', 'ChaikinVolatility', 'RVI']
     for col in required_cols:
@@ -497,12 +496,11 @@ def apply_Weekly_conditions(df):
 
    
 
-    df.loc[Weekly_Breakout, 'Signal'] = 'Bull'
-    df.loc[Weekly_Breakdown, 'Signal'] = 'Bear'
+    df.loc[Weekly_Breakout, 'Signal'] = 'WeeklyBull'
+    df.loc[Weekly_Breakdown, 'Signal'] = 'WeeklyBear'
 
 
     return df
-
 
 def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     # ✅ Ensure correct market hours: 9:15 AM - 3:30 PM IST
