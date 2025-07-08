@@ -477,7 +477,7 @@ def apply_bull_bear_conditions(df):
     return df
 
 def apply_Weekly_conditions(df):
-    required_cols = ['close', 'Supertrend', 'R1_Demark', 'S1_Demark', 'ChaikinVolatility', 'RVI']
+    required_cols = ['prev_high', 'prev_low', 'close']
     for col in required_cols:
         if col not in df.columns:
             print(f"❌ Missing column '{col}' for Wbull/Wbear condition check.")
@@ -490,13 +490,13 @@ def apply_Weekly_conditions(df):
     )
 
     Weekly_Breakdown = (
-        (df['close'] < df['prev_close']) &
-        (df['close'].shift(1) > df['prev_close'])
+        (df['close'] < df['prev_low']) &
+        (df['close'].shift(1) > df['prev_low'])
     )
 
    
      # Initialize signal column
-    df['WeeklySignal'] = 'Neutral' 
+    df['WeeklySignal'] = 'WNeutral' 
     
     df.loc[Weekly_Breakout, 'WeeklySignal'] = 'WeeklyBull'
     df.loc[Weekly_Breakdown, 'WeeklySignal'] = 'WeeklyBear'
