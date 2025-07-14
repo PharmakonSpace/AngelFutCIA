@@ -314,32 +314,72 @@ def calculate_camarilla_pivots(df):
 
     return df
 
-# Shared function to calculate weekly OHLC
-def calculate_weekly_ohlc(df, symbol):
+def calculate_weekly_camarilla_pivots(df):
     if df.empty:
-        print(f"⚠️ DataFrame is empty for {symbol}, skipping weekly OHLC calculation.")
-        return None
+        print("⚠️ DataFrame is empty, skipping Camarilla pivot calculation.")
+        return df
 
-    # Ensure timestamp is in datetime format and in IST
-    df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True).dt.tz_convert('Asia/Kolkata')
-    
-    # Ensure required columns exist
-    required_cols = ['high', 'low', 'close', 'open']
-    if not all(col in df.columns for col in required_cols):
-        print(f"❌ Missing required columns for {symbol}: {set(required_cols) - set(df.columns)}")
-        return None
+    print("Columns before renaming:", df.columns)
 
-    # Define weeks as Monday–Sunday for consistency with Indian markets
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    rename_dict = {'H': 'high', 'L': 'low', 'C': 'close', 'O': 'open'}
+    df.rename(columns=rename_dict, inplace=True)
+
+    if not all(col in df.columns for col in ['high', 'low', 'close']):
+        print("⚠️ Missing required columns for Camarilla calculation: 'high', 'low', 'close'")
+        return df
+
+    # Ensure at least two weeks of data
     df['week'] = df['timestamp'].dt.to_period('W-SUN').apply(lambda r: r.start_time)
-
-    # Check if enough weeks are present
     weeks_covered = df['week'].nunique()
     if weeks_covered < 2:
-        print(f"⚠️ Not enough weeks of data for {symbol} (requires at least 2 weeks).")
-        return None
+        print("⚠️ Not enough weeks of data for Camarilla pivots (requires at least 2 weeks).")
+        return df
 
-    # Aggregate weekly OHLC
-    weekly_ohlc = (
+    # Aggregating high, low, and close prices by week
+    weekly_df = df.groupby('week').agg({
+        'high': 'max',
+        'low': 'min',
+        'close': 'last'
+    }).shift(1).dropna()  # Shift to get previous week's data
+
+    # Debug: Print weekly data before calculations
+    print("Weekly Camarilla OHLC (Previous Week):\n", weekly_df.head())
+
+    # Camarilla Pivot Calculations
+    weekly_df['W_PP'] = (weekly_df['high'] + weekly_df['low'] + weekly_df['close']) / 3
+    weekly_df['W_R1'] = weekly_df['close'] + (1.1 / 12) * (weekly_df['high'] - weekly_df['low'])
+    weekly_df['W_R2'] = weekly_df['close'] + (1.1 / 6) * (weekly_df['high'] - weekly_df['low'])
+    weekly_df['W_R3'] = weekly_df['close'] + (1.1 / 4) * (weekly_df['high'] - weekly_df['low'])
+    weekly_df['W_R4'] = weekly_df['close'] + (1.1 / 2) * (weekly_df['high'] - weekly_df['low'])
+    weekly_df['W_S1'] = weekly_df['close'] - (1.1 / 12) * (weekly_df['high'] - weekly_df['low'])
+    weekly_df['W_S2'] = weekly_df['close'] - (1.1 / 6) * (weekly_df['high'] - weekly_df['low'])
+    weekly_df['W_S3'] = weekly_df['close'] - (1.1 / 4) * (weekly_df['high'] - weekly_df['low'])
+    weekly_df['W_S4'] = weekly_df['close'] - (1.1 / 2) * (weekly_df['high'] - weekly_df['low'])
+
+    weekly_df.reset_index(inplace=True)
+    df = df.merge(weekly_df[['week', 'W_PP', 'W_R1', 'W_R2', 'W_R3', 'W_R4', 'W_S1', 'W_S2', 'W_S3', 'W_S4']], on="week", how="left")
+    print(f"✅ Weekly Camarilla Data:\n{weekly_df.head()}")
+    return df
+
+def calculate_weekly_demark_pivots(df):
+    if df.empty:
+        print("⚠️ DataFrame is empty, skipping DeMark pivot calculation.")
+        return df
+
+    print("Columns before DeMark calculation:", df.columns)
+
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df['week'] = df['timestamp'].dt.to_period('W-SUN').apply(lambda r: r.start_time)
+
+    # Ensure at least two weeks of data
+    weeks_covered = df['week'].nunique()
+    if weeks_covered < 2:
+        print("⚠️ Not enough weeks of data for DeMark pivots (requires at least 2 weeks).")
+        return df
+
+    # Compute previous week's OHLC data
+    weekly_summary = (
         df.groupby('week')
         .agg(
             prev_high=('high', 'max'),
@@ -348,67 +388,15 @@ def calculate_weekly_ohlc(df, symbol):
             prev_open=('open', 'first')
         )
         .shift(1)  # Use previous week's data
-        .dropna()  # Remove rows with NaN values
+        .dropna()  # Drop rows with NaN (no previous week)
         .reset_index()
     )
 
-    if weekly_ohlc.empty:
-        print(f"⚠️ No previous week data available for {symbol}.")
-        return None
+    # Debug: Print weekly summary
+    print("Weekly DeMark OHLC (Previous Week):\n", weekly_summary.head())
 
-    # Save weekly OHLC for debugging
-    weekly_ohlc.to_csv(f"weekly_ohlc_{symbol}.csv", index=False)
-    print(f"✅ Saved weekly OHLC data for {symbol} to weekly_ohlc_{symbol}.csv")
-    print(f"Weekly OHLC Data for {symbol}:\n{weekly_ohlc.head()}")
-
-    return weekly_ohlc
-
-# Updated calculate_weekly_camarilla_pivots
-def calculate_weekly_camarilla_pivots(df, symbol):
-    if df.empty:
-        print(f"⚠️ DataFrame is empty for {symbol}, skipping Camarilla pivot calculation.")
-        return df
-
-    # Get weekly OHLC data
-    weekly_ohlc = calculate_weekly_ohlc(df, symbol)
-    if weekly_ohlc is None:
-        print(f"⚠️ Skipping Camarilla pivot calculation for {symbol} due to missing weekly OHLC.")
-        return df
-
-    # Camarilla Pivot Calculations
-    weekly_ohlc['W_PP'] = (weekly_ohlc['prev_high'] + weekly_ohlc['prev_low'] + weekly_ohlc['prev_close']) / 3
-    weekly_ohlc['W_R1'] = weekly_ohlc['prev_close'] + (1.1 / 12) * (weekly_ohlc['prev_high'] - weekly_ohlc['prev_low'])
-    weekly_ohlc['W_R2'] = weekly_ohlc['prev_close'] + (1.1 / 6) * (weekly_ohlc['prev_high'] - weekly_ohlc['prev_low'])
-    weekly_ohlc['W_R3'] = weekly_ohlc['prev_close'] + (1.1 / 4) * (weekly_ohlc['prev_high'] - weekly_ohlc['prev_low'])
-    weekly_ohlc['W_R4'] = weekly_ohlc['prev_close'] + (1.1 / 2) * (weekly_ohlc['prev_high'] - weekly_ohlc['prev_low'])
-    weekly_ohlc['W_S1'] = weekly_ohlc['prev_close'] - (1.1 / 12) * (weekly_ohlc['prev_high'] - weekly_ohlc['prev_low'])
-    weekly_ohlc['W_S2'] = weekly_ohlc['prev_close'] - (1.1 / 6) * (weekly_ohlc['prev_high'] - weekly_ohlc['prev_low'])
-    weekly_ohlc['W_S3'] = weekly_ohlc['prev_close'] - (1.1 / 4) * (weekly_ohlc['prev_high'] - weekly_ohlc['prev_low'])
-    weekly_ohlc['W_S4'] = weekly_ohlc['prev_close'] - (1.1 / 2) * (weekly_ohlc['prev_high'] - weekly_ohlc['prev_low'])
-
-    # Merge with original DataFrame
-    df['week'] = df['timestamp'].dt.to_period('W-SUN').apply(lambda r: r.start_time)
-    df = df.merge(weekly_ohlc[['week', 'W_PP', 'W_R1', 'W_R2', 'W_R3', 'W_R4', 'W_S1', 'W_S2', 'W_S3', 'W_S4']], on='week', how='left')
-    df[['W_PP', 'W_R1', 'W_R2', 'W_R3', 'W_R4', 'W_S1', 'W_S2', 'W_S3', 'W_S4']] = df[['W_PP', 'W_R1', 'W_R2', 'W_R3', 'W_R4', 'W_S1', 'W_S2', 'W_S3', 'W_S4']].ffill()
-
-    print(f"✅ Weekly Camarilla Pivots calculated for {symbol}")
-    return df
-
-# Updated calculate_weekly_demark_pivots
-def calculate_weekly_demark_pivots(df, symbol):
-    if df.empty:
-        print(f"⚠️ DataFrame is empty for {symbol}, skipping DeMark pivot calculation.")
-        return df
-
-    # Get weekly OHLC data
-    weekly_ohlc = calculate_weekly_ohlc(df, symbol)
-    if weekly_ohlc is None:
-        print(f"⚠️ Skipping DeMark pivot calculation for {symbol} due to missing weekly OHLC.")
-        return df
-
-    # Merge with original DataFrame
-    df['week'] = df['timestamp'].dt.to_period('W-SUN').apply(lambda r: r.start_time)
-    df = df.merge(weekly_ohlc[['week', 'prev_high', 'prev_low', 'prev_close', 'prev_open']], on='week', how='left')
+    # Merge into main DataFrame
+    df = df.merge(weekly_summary, on='week', how='left')
     df[['prev_high', 'prev_low', 'prev_close', 'prev_open']] = df[['prev_high', 'prev_low', 'prev_close', 'prev_open']].ffill()
 
     # Apply DeMark conditional logic
@@ -429,7 +417,7 @@ def calculate_weekly_demark_pivots(df, symbol):
     df['R1_Demark'] = (df['X'] / 2) - df['prev_low']
     df['S1_Demark'] = (df['X'] / 2) - df['prev_high']
 
-    print(f"✅ Weekly DeMark Pivots calculated for {symbol}")
+    print("✅ DeMark Pivots calculated based on previous week's OHLC.")
     return df
 
 
@@ -521,12 +509,10 @@ def apply_Weekly_conditions(df):
     return df
 
 def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
-    today_ist = datetime.now(pytz.timezone("Asia/Kolkata"))
+    # ✅ Ensure correct market hours: 9:15 AM - 3:30 PM IST
+    today_ist = datetime.now(IST_TZ)
     to_date = today_ist.replace(hour=15, minute=30, second=0, microsecond=0)
-    # Adjust to_date if July 14, 2025, is a holiday (e.g., Muharram)
-    if today_ist.date().weekday() == 0:  # Monday
-        to_date = to_date - timedelta(days=3)  # Use previous Friday
-    from_date = to_date - timedelta(days=21)  # Fetch 21 days of data
+    from_date = to_date - timedelta(days=15)
 
     from_date_format = from_date.strftime("%Y-%m-%d 09:15")
     to_date_format = to_date.strftime("%Y-%m-%d 15:30")
@@ -536,17 +522,16 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     if not token or pd.isna(token):
         print(f"❌ Error: Invalid token ({token}) for {symbol}")
         return None
-    
     exchange = getExchangeSegment(symbol)
     for attempt in range(3):
         try:
             historicParam = {
-                "exchange": exchange,
-                "symboltoken": str(token),
-                "interval": interval,
-                "fromdate": from_date_format,
-                "todate": to_date_format
-            }
+            "exchange": exchange,
+            "symboltoken": str(token),
+            "interval": interval,
+            "fromdate": from_date_format,
+            "todate": to_date_format
+        }
 
             response = credentials.SMART_API_OBJ.getCandleData(historicParam)
 
@@ -556,22 +541,15 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
                 continue
 
             df = pd.DataFrame(response['data'], columns=['timestamp', 'O', 'H', 'L', 'C', 'V'])
-            # Rename columns immediately
-            df.rename(columns={'O': 'open', 'H': 'high', 'L': 'low', 'C': 'close', 'V': 'volume'}, inplace=True)
-            df = calculate_indicators(df, symbol)
-            df = calculate_supertrend(df)
-            df = calculate_camarilla_pivots(df)
-            df = calculate_weekly_camarilla_pivots(df, symbol)  # Pass symbol
-            df = calculate_weekly_demark_pivots(df, symbol)    # Pass symbol
+            df = calculate_indicators(df, symbol)  # Ensure this modifies df
+            df = calculate_supertrend(df) 
+            df = calculate_camarilla_pivots(df) 
+            df = calculate_weekly_camarilla_pivots(df) 
+            df = calculate_weekly_demark_pivots(df)
             df = calculate_chaikin_volatility(df)
-            df = calculate_rvi(df)
+            df=  calculate_rvi(df)
             df = apply_bull_bear_conditions(df)
             df = apply_Weekly_conditions(df)
-            
-            # Save raw data for debugging
-            df.to_csv(f"raw_data_{symbol}.csv", index=False)
-            print(f"✅ Saved raw data for {symbol} to raw_data_{symbol}.csv")
-            
             return df
 
         except Exception as e:
