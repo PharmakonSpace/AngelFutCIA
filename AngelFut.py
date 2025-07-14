@@ -314,6 +314,7 @@ def calculate_camarilla_pivots(df):
 
     return df
 
+# Shared function to calculate weekly OHLC
 def calculate_weekly_ohlc(df, symbol):
     if df.empty:
         print(f"⚠️ DataFrame is empty for {symbol}, skipping weekly OHLC calculation.")
@@ -362,6 +363,7 @@ def calculate_weekly_ohlc(df, symbol):
 
     return weekly_ohlc
 
+# Updated calculate_weekly_camarilla_pivots
 def calculate_weekly_camarilla_pivots(df, symbol):
     if df.empty:
         print(f"⚠️ DataFrame is empty for {symbol}, skipping Camarilla pivot calculation.")
@@ -392,6 +394,7 @@ def calculate_weekly_camarilla_pivots(df, symbol):
     print(f"✅ Weekly Camarilla Pivots calculated for {symbol}")
     return df
 
+# Updated calculate_weekly_demark_pivots
 def calculate_weekly_demark_pivots(df, symbol):
     if df.empty:
         print(f"⚠️ DataFrame is empty for {symbol}, skipping DeMark pivot calculation.")
@@ -518,10 +521,12 @@ def apply_Weekly_conditions(df):
     return df
 
 def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
-    # ✅ Ensure correct market hours: 9:15 AM - 3:30 PM IST
-    today_ist = datetime.now(IST_TZ)
+    today_ist = datetime.now(pytz.timezone("Asia/Kolkata"))
     to_date = today_ist.replace(hour=15, minute=30, second=0, microsecond=0)
-    from_date = to_date - timedelta(days=15)
+    # Adjust to_date if July 14, 2025, is a holiday (e.g., Muharram)
+    if today_ist.date().weekday() == 0:  # Monday
+        to_date = to_date - timedelta(days=3)  # Use previous Friday
+    from_date = to_date - timedelta(days=21)  # Fetch 21 days of data
 
     from_date_format = from_date.strftime("%Y-%m-%d 09:15")
     to_date_format = to_date.strftime("%Y-%m-%d 15:30")
@@ -531,16 +536,17 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     if not token or pd.isna(token):
         print(f"❌ Error: Invalid token ({token}) for {symbol}")
         return None
+    
     exchange = getExchangeSegment(symbol)
     for attempt in range(3):
         try:
             historicParam = {
-            "exchange": exchange,
-            "symboltoken": str(token),
-            "interval": interval,
-            "fromdate": from_date_format,
-            "todate": to_date_format
-        }
+                "exchange": exchange,
+                "symboltoken": str(token),
+                "interval": interval,
+                "fromdate": from_date_format,
+                "todate": to_date_format
+            }
 
             response = credentials.SMART_API_OBJ.getCandleData(historicParam)
 
@@ -550,15 +556,22 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
                 continue
 
             df = pd.DataFrame(response['data'], columns=['timestamp', 'O', 'H', 'L', 'C', 'V'])
-            df = calculate_indicators(df, symbol)  # Ensure this modifies df
-            df = calculate_supertrend(df) 
-            df = calculate_camarilla_pivots(df) 
-            df = calculate_weekly_camarilla_pivots(df) 
-            df = calculate_weekly_demark_pivots(df)
+            # Rename columns immediately
+            df.rename(columns={'O': 'open', 'H': 'high', 'L': 'low', 'C': 'close', 'V': 'volume'}, inplace=True)
+            df = calculate_indicators(df, symbol)
+            df = calculate_supertrend(df)
+            df = calculate_camarilla_pivots(df)
+            df = calculate_weekly_camarilla_pivots(df, symbol)  # Pass symbol
+            df = calculate_weekly_demark_pivots(df, symbol)    # Pass symbol
             df = calculate_chaikin_volatility(df)
-            df=  calculate_rvi(df)
+            df = calculate_rvi(df)
             df = apply_bull_bear_conditions(df)
             df = apply_Weekly_conditions(df)
+            
+            # Save raw data for debugging
+            df.to_csv(f"raw_data_{symbol}.csv", index=False)
+            print(f"✅ Saved raw data for {symbol} to raw_data_{symbol}.csv")
+            
             return df
 
         except Exception as e:
