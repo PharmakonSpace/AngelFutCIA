@@ -364,21 +364,17 @@ def calculate_weekly_ohlc(df, symbol):
     # Drop rows where current_week is NaN (last week has no next week)
     weekly_ohlc = weekly_ohlc.dropna(subset=['current_week'])
 
-    # Debug: Print weekly OHLC with week ranges
-    print(f"Weekly OHLC for {symbol} (Previous Week):")
+    # Debug: Print weekly OHLC with clear week ranges
+    print(f"Weekly OHLC for {symbol}:")
     for idx, row in weekly_ohlc.iterrows():
         week_start = row['current_week']
         week_end = (pd.Timestamp(week_start) + timedelta(days=6)).strftime('%Y-%m-%d')
         prev_week_start = (pd.Timestamp(week_start) - timedelta(days=7)).strftime('%Y-%m-%d')
         prev_week_end = (pd.Timestamp(week_start) - timedelta(days=1)).strftime('%Y-%m-%d')
-        print(f"  Current Week: {week_start} to {week_end}")
-        print(f"  Previous Week OHLC (for {prev_week_start} to {prev_week_end}):")
-        print(f"    prev_high={row['prev_high']}, prev_low={row['prev_low']}, "
-              f"prev_close={row['prev_close']}, prev_open={row['prev_open']}")
-
-    # Save to CSV for validation
-    weekly_ohlc.to_csv(f"weekly_ohlc_{symbol}.csv", index=False)
-    print(f"Saved weekly OHLC data to weekly_ohlc_{symbol}.csv")
+        print(f"  Current Week: {week_start} to {week_end} (used for pivots)")
+        print(f"  Previous Week OHLC (from {prev_week_start} to {prev_week_end}):")
+        print(f"    prev_high={row['prev_high']:.2f}, prev_low={row['prev_low']:.2f}, "
+              f"prev_close={row['prev_close']:.2f}, prev_open={row['prev_open']:.2f}")
 
     # Merge into main DataFrame using current_week
     df = df.merge(weekly_ohlc[['current_week', 'prev_high', 'prev_low', 'prev_close', 'prev_open']], 
@@ -421,7 +417,19 @@ def calculate_weekly_camarilla_pivots(df, symbol):
     df = df.merge(weekly_df[['week', 'W_PP', 'W_R1', 'W_R2', 'W_R3', 'W_R4', 'W_S1', 'W_S2', 'W_S3', 'W_S4']], 
                   on='week', how='left')
 
-    print(f"✅ Weekly Camarilla Pivots for {symbol}:\n", weekly_df.head())
+    # Debug: Print Camarilla pivots with week ranges
+    print(f"✅ Weekly Camarilla Pivots for {symbol}:")
+    for idx, row in weekly_df.iterrows():
+        week_start = row['week']
+        week_end = (pd.Timestamp(week_start) + timedelta(days=6)).strftime('%Y-%m-%d')
+        prev_week_start = (pd.Timestamp(week_start) - timedelta(days=7)).strftime('%Y-%m-%d')
+        prev_week_end = (pd.Timestamp(week_start) - timedelta(days=1)).strftime('%Y-%m-%d')
+        print(f"  Current Week: {week_start} to {week_end}")
+        print(f"  Previous Week OHLC (from {prev_week_start} to {prev_week_end}):")
+        print(f"    prev_high={row['prev_high']:.2f}, prev_low={row['prev_low']:.2f}, "
+              f"prev_close={row['prev_close']:.2f}")
+        print(f"    W_PP={row['W_PP']:.2f}, W_R1={row['W_R1']:.2f}, ..., W_S4={row['W_S4']:.2f}")
+
     return df
 
 def calculate_weekly_demark_pivots(df, symbol):
@@ -463,7 +471,20 @@ def calculate_weekly_demark_pivots(df, symbol):
     df = df.merge(weekly_df[['week', 'PP_Demark', 'R1_Demark', 'S1_Demark']], 
                   on='week', how='left')
 
-    print(f"✅ Weekly DeMark Pivots for {symbol}:\n", weekly_df.head())
+    # Debug: Print DeMark pivots with week ranges
+    print(f"✅ Weekly DeMark Pivots for {symbol}:")
+    for idx, row in weekly_df.iterrows():
+        week_start = row['week']
+        week_end = (pd.Timestamp(week_start) + timedelta(days=6)).strftime('%Y-%m-%d')
+        prev_week_start = (pd.Timestamp(week_start) - timedelta(days=7)).strftime('%Y-%m-%d')
+        prev_week_end = (pd.Timestamp(week_start) - timedelta(days=1)).strftime('%Y-%m-%d')
+        print(f"  Current Week: {week_start} to {week_end}")
+        print(f"  Previous Week OHLC (from {prev_week_start} to {prev_week_end}):")
+        print(f"    prev_high={row['prev_high']:.2f}, prev_low={row['prev_low']:.2f}, "
+              f"prev_close={row['prev_close']:.2f}, prev_open={row['prev_open']:.2f}")
+        print(f"    PP_Demark={row['PP_Demark']:.2f}, R1_Demark={row['R1_Demark']:.2f}, "
+              f"S1_Demark={row['S1_Demark']:.2f}")
+
     return df
 
 def getExchangeSegment(symbol):
@@ -555,7 +576,7 @@ def apply_Weekly_conditions(df):
 def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     today_ist = datetime.now(pytz.timezone("Asia/Kolkata"))
     to_date = today_ist.replace(hour=15, minute=30, second=0, microsecond=0)
-    from_date = to_date - timedelta(days=28)  # Extended to 28 days for robustness
+    from_date = to_date - timedelta(days=28)  # 28 days for robustness
     from_date_format = from_date.strftime("%Y-%m-%d 09:15")
     to_date_format = to_date.strftime("%Y-%m-%d 15:30")
     print(f"📅 Fetching data for {symbol} from {from_date_format} to {to_date_format}")
@@ -582,10 +603,6 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
                 continue
 
             df = pd.DataFrame(response['data'], columns=['timestamp', 'O', 'H', 'L', 'C', 'V'])
-            # Save raw data for debugging
-            df.to_csv(f"raw_data_{symbol}.csv", index=False)
-            print(f"Saved raw data for {symbol} to raw_data_{symbol}.csv")
-            
             df = calculate_indicators(df, symbol)
             df = calculate_supertrend(df)
             df = calculate_camarilla_pivots(df)
