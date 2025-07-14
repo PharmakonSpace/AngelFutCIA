@@ -477,7 +477,7 @@ def apply_bull_bear_conditions(df):
     return df
 
 def apply_Weekly_conditions(df):
-    required_cols = ['prev_high', 'prev_low', 'close']
+    required_cols = ['prev_high', 'prev_low', 'close','low','high']
     for col in required_cols:
         if col not in df.columns:
             print(f"❌ Missing column '{col}' for Wbull/Wbear condition check.")
