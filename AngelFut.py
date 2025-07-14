@@ -434,6 +434,7 @@ def apply_bull_bear_conditions(df):
             print(f"❌ Missing column '{col}' for bull/bear condition check.")
             return df
 
+    # Fresh Bullish breakout
     bull_condition = (
         (df['close'] > df['Supertrend']) &
         (df['close'] > df['R1_Demark']) &
@@ -441,49 +442,66 @@ def apply_bull_bear_conditions(df):
         (df['ChaikinVolatility'] > 0) &
         (df['RVI'] > 50)
     )
+
+    # Fresh Bearish breakdown
     bear_condition = (
         (df['close'] < df['Supertrend']) &
         (df['close'] < df['S1_Demark']) &
         (df['close'].shift(1) > df['S1_Demark']) &
+        #(df['ChaikinVolatility'] < 0) &
         (df['RVI'] < 50)
     )
+
+    # Continuation signals
     bull_continue = (
         (df['close'] > df['Supertrend']) &
         (df['close'] > df['R1_Demark'])
     )
+
     bear_continue = (
         (df['close'] < df['Supertrend']) &
         (df['close'] < df['S1_Demark'])
     )
 
+    # Initialize signal column
     df['Signal'] = 'Neutral'
+
     df.loc[bull_condition, 'Signal'] = 'Bull'
     df.loc[bear_condition, 'Signal'] = 'Bear'
     df.loc[(bull_continue) & (df['Signal'] == 'Neutral'), 'Signal'] = 'BullContinue'
     df.loc[(bear_continue) & (df['Signal'] == 'Neutral'), 'Signal'] = 'BearContinue'
 
+    # Remove Neutral rows
     df = df[df['Signal'] != 'Neutral']
+
     return df
 
 def apply_Weekly_conditions(df):
-    required_cols = ['prev_high', 'prev_low', 'close']
+    required_cols = ['prev_high', 'prev_low', 'close','low','high']
     for col in required_cols:
         if col not in df.columns:
-            print(f"❌ Missing column '{col}' for WeeklyBull/WeeklyBear condition check.")
+            print(f"❌ Missing column '{col}' for Wbull/Wbear condition check.")
             return df
-
+   
+    # Continuation signals
     Weekly_Breakout = (
         (df['close'] > df['prev_high']) &
-        (df['close'].shift(1) <= df['prev_high'])
-    )
-    Weekly_Breakdown = (
-        (df['close'] < df['prev_low']) &
-        (df['close'].shift(1) >= df['prev_low'])
+        (df['low'] < df['prev_high'])
     )
 
-    df['WeeklySignal'] = 'WNeutral'
+    Weekly_Breakdown = (
+        (df['close'] < df['prev_low']) &
+        (df['high'] > df['prev_low'])
+    )
+
+   
+     # Initialize signal column
+    df['WeeklySignal'] = 'WNeutral' 
+    
     df.loc[Weekly_Breakout, 'WeeklySignal'] = 'WeeklyBull'
     df.loc[Weekly_Breakdown, 'WeeklySignal'] = 'WeeklyBear'
+
+
     return df
 
 def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
@@ -519,15 +537,13 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
                 continue
 
             df = pd.DataFrame(response['data'], columns=['timestamp', 'O', 'H', 'L', 'C', 'V'])
-            df = calculate_indicators(df, symbol)
-            df = calculate_supertrend(df)
-            df = calculate_camarilla_pivots(df)
-            df = calculate_weekly_camarilla_pivots(df)
+            df = calculate_indicators(df, symbol)  # Ensure this modifies df
+            df = calculate_supertrend(df) 
+            df = calculate_camarilla_pivots(df) 
+            df = calculate_weekly_camarilla_pivots(df) 
             df = calculate_weekly_demark_pivots(df)
             df = calculate_chaikin_volatility(df)
-            df = calculate_rvi(df)
-            
-            # Apply Weekly conditions first
+            df=  calculate_rvi(df)
             df = apply_Weekly_conditions(df)
             df = apply_bull_bear_conditions(df)
             
@@ -565,11 +581,13 @@ if __name__ == '__main__':
     worker()  # Start fetching data
 
     if all_data:
-    final_df = pd.concat(all_data, ignore_index=True)
-    final_df['timestamp'] = pd.to_datetime(final_df['timestamp'], utc=True).dt.tz_convert(IST_TZ)
-    final_df.to_csv(OUTPUT_FILE, index=False)
-    final_df = final_df.applymap(flatten_data)
-    upload_to_google_sheets(final_df, worksheet)
+        final_df = pd.concat(all_data, ignore_index=True)
+        final_df['timestamp'] = pd.to_datetime(final_df['timestamp'], utc=True).dt.tz_convert(IST_TZ)
+        final_df.to_csv(OUTPUT_FILE, index=False)
+        # Convert all datetime columns in final_df to string
+        final_df = final_df.applymap(flatten_data)
+        # Upload the summary data to Google Sheets
+        upload_to_google_sheets(final_df, worksheet)
 
         print(f"✅ Data saved to {OUTPUT_FILE}")
 
