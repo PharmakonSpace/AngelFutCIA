@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import credentials
 import numpy as np
 from time import sleep
-#from talib.abstract import RSI, ATR
+from datetime import datetime
 import pyotp
 import warnings
 import os
@@ -26,49 +26,67 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Smart API credentials from .env
-USER_NAME = os.getenv("USER_NAME")
-API_KEY = os.getenv("API_KEY")
-PWD = os.getenv("PWD")
-TOTP_SECRET = os.getenv("TOTP_SECRET")
-SMART_API_OBJ= os.getenv("SMART_API_OBJ")
-TOKEN_MAP =  os.getenv("TOKEN_MAP")
-# Run Angelmasterlist.py
+# Setup basic logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 # Fetch credentials and Sheet ID from environment variables
-credentials_json = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
-SHEET_ID =  os.getenv ('SHEET_ID')
+credentials_json = os.getenv('GOOGLE_SHEETS_CREDENTIALS')  # JSON string
+SHEET_ID = "17y8FzzvHnc5jgMoS40H1WXxj133PgAcjfxYcXtoGwh4"
+TAB_NAME = "1hrST"  # Define the target sheet/tab name
 
 if not credentials_json:
     raise ValueError("GOOGLE_SHEETS_CREDENTIALS environment variable is not set.")
 
 # Authenticate using the JSON string from environment
 credentials_info = json.loads(credentials_json)
-credentials = Credentials.from_service_account_info(
+credentialsg = Credentials.from_service_account_info(
     credentials_info,
     scopes=["https://www.googleapis.com/auth/spreadsheets"]
 )
-client = gspread.authorize(credentials)
+client = gspread.authorize(credentialsg)
 
 # Open the Google Sheet by ID
 sheet = client.open_by_key(SHEET_ID)
 
-# Function to update data in a Google Sheet tab
-def upload_to_sheets(df, tab_name):
+# Check if "LOC" tab exists, if not, create it
+try:
+    worksheet = sheet.worksheet(TAB_NAME)
+except gspread.exceptions.WorksheetNotFound:
+    worksheet = sheet.add_worksheet(title=TAB_NAME, rows="100", cols="20")  # Adjust size as needed
+
+
+# Flatten any nested structures for uploading to Google Sheets
+def flatten_data(value):
+    if isinstance(value, (list, dict)):
+        return json.dumps(value)
+    elif isinstance(value, pd.Timestamp):
+        return value.strftime("%Y-%m-%d %H:%M:%S")  # Ensure consistent format for datetime
+    elif isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        return value
+
+
+# Function to upload DataFrame to Google Sheets
+def upload_to_google_sheets(final_df, worksheet):
+    if final_df.empty:
+        print("No data to upload. Skipping Google Sheets update.")
+        return
+
     try:
-        # Replace problematic values with empty strings or a placeholder
-        df_clean = df.replace([float('inf'), float('-inf')], None)
-        df_clean = df_clean.fillna('')  # or use a placeholder like 'NA'
+        # Convert DataFrame to list of lists
+        data = [final_df.columns.tolist()] + final_df.astype(str).values.tolist()
 
-        try:
-            worksheet = sheet.worksheet(tab_name)
-        except gspread.exceptions.WorksheetNotFound:
-            worksheet = sheet.add_worksheet(title=tab_name, rows="100", cols="20")
-
+        print("Clearing worksheet before upload...")
         worksheet.clear()
-        worksheet.update([df_clean.columns.values.tolist()] + df_clean.values.tolist())
-        print(f"✅ Data uploaded to '{tab_name}' tab.")
+
+        print("Uploading data to Google Sheets...")
+        worksheet.update(data)
+        
+        print(f"Data successfully uploaded to Google Sheets - Tab: {TAB_NAME}")
     except Exception as e:
-        print(f"❌ Google Sheet error for {tab_name}: {e}")
+        print(f"Error uploading to Google Sheets: {e}")
+
         
 script_dir = os.path.dirname(os.path.abspath(__file__))
 angel_script = os.path.join(script_dir, "Angelmasterlist.py")
@@ -78,7 +96,7 @@ try:
 except subprocess.CalledProcessError as e:
     print(f"❌ Failed to run Angelmasterlist.py: {e}")
     exit()
-
+    
 # Google Sheets Credentials Setup
 def fetch_symbols_from_csv(file_path="Angel_MasterList.csv", column_name="symbol"):
     try:
@@ -454,12 +472,38 @@ def apply_bull_bear_conditions(df):
     df.loc[(bear_continue) & (df['Signal'] == 'Neutral'), 'Signal'] = 'BearContinue'
 
     # Remove Neutral rows
-    df = df[df['Signal'] != 'Neutral']
+    #df = df[df['Signal'] != 'Neutral']
 
     return df
 
+def apply_Weekly_conditions(df):
+    required_cols = ['prev_high', 'prev_low', 'close']
+    for col in required_cols:
+        if col not in df.columns:
+            print(f"❌ Missing column '{col}' for WeeklyBull/WeeklyBear condition check.")
+            return df
 
+    # Fresh Weekly Breakout: Close above previous week's high, and previous candle's close was not above
+    Weekly_Breakout = (
+        (df['close'] > df['prev_high']) & 
+        (df['close'].shift(1) <= df['prev_high'])
+    )
 
+    # Fresh Weekly Breakdown: Close below previous week's low, and previous candle's close was not below
+    Weekly_Breakdown = (
+        (df['close'] < df['prev_low']) & 
+        (df['close'].shift(1) >= df['prev_low'])
+    )
+
+    # Initialize signal column
+    df['WeeklySignal'] = 'WNeutral'
+
+    # Assign signals
+    df.loc[Weekly_Breakout, 'WeeklySignal'] = 'WeeklyBull'
+    df.loc[Weekly_Breakdown, 'WeeklySignal'] = 'WeeklyBear'
+
+    return df
+    
 def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     # ✅ Ensure correct market hours: 9:15 AM - 3:30 PM IST
     today_ist = datetime.now(IST_TZ)
@@ -501,6 +545,7 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
             df = calculate_chaikin_volatility(df)
             df=  calculate_rvi(df)
             df = apply_bull_bear_conditions(df)
+            df = apply_Weekly_conditions(df)
             return df
 
         except Exception as e:
@@ -537,7 +582,16 @@ if __name__ == '__main__':
     if all_data:
         final_df = pd.concat(all_data, ignore_index=True)
         final_df['timestamp'] = pd.to_datetime(final_df['timestamp'], utc=True).dt.tz_convert(IST_TZ)
+        
+        # Filter rows where both Signal is Neutral AND WeeklySignal is WNeutral
+        final_df = final_df[~((final_df['Signal'] == 'Neutral') & (final_df['WeeklySignal'] == 'WNeutral'))]
+        
         final_df.to_csv(OUTPUT_FILE, index=False)
+        # Convert all datetime columns in final_df to string
+        final_df = final_df.applymap(flatten_data)
+        # Upload the summary data to Google Sheets
+        upload_to_google_sheets(final_df, worksheet)
+    
         print(f"✅ Data saved to {OUTPUT_FILE}")
 
     print("✅ Data collection completed.")
