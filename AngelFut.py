@@ -491,7 +491,7 @@ def apply_Weekly_conditions(df):
 
     Weekly_Breakdown = (
         (df['close'] < df['prev_low']) &
-        (df['low'] > df['prev_low'])
+        (df['high'] > df['prev_low'])
     )
 
    
