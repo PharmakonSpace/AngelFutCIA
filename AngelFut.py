@@ -318,7 +318,7 @@ def calculate_weekly_ohlc(df, symbol):
     """
     Calculate previous week's OHLC data for a given DataFrame.
     Returns the DataFrame with merged prev_high, prev_low, prev_close, prev_open columns,
-    correctly aligned with the current week.
+    aligned with the current week.
     """
     if df.empty:
         print(f"⚠️ DataFrame is empty for {symbol}, skipping weekly OHLC calculation.")
@@ -354,19 +354,20 @@ def calculate_weekly_ohlc(df, symbol):
         .reset_index()
     )
 
-    # Shift to get previous week's OHLC and rename columns
-    weekly_ohlc['prev_high'] = weekly_ohlc['high'].shift(1)
-    weekly_ohlc['prev_low'] = weekly_ohlc['low'].shift(1)
-    weekly_ohlc['prev_close'] = weekly_ohlc['close'].shift(1)
-    weekly_ohlc['prev_open'] = weekly_ohlc['open'].shift(1)
+    # Create a new week column for the current week (shift week forward)
+    weekly_ohlc['current_week'] = weekly_ohlc['week'].shift(-1)
+    weekly_ohlc['prev_high'] = weekly_ohlc['high']
+    weekly_ohlc['prev_low'] = weekly_ohlc['low']
+    weekly_ohlc['prev_close'] = weekly_ohlc['close']
+    weekly_ohlc['prev_open'] = weekly_ohlc['open']
 
-    # Drop rows where previous week data is missing
-    weekly_ohlc = weekly_ohlc.dropna(subset=['prev_high', 'prev_low', 'prev_close', 'prev_open'])
+    # Drop rows where current_week is NaN (last week has no next week)
+    weekly_ohlc = weekly_ohlc.dropna(subset=['current_week'])
 
     # Debug: Print weekly OHLC with week ranges
     print(f"Weekly OHLC for {symbol} (Previous Week):")
     for idx, row in weekly_ohlc.iterrows():
-        week_start = row['week']
+        week_start = row['current_week']
         week_end = (pd.Timestamp(week_start) + timedelta(days=6)).strftime('%Y-%m-%d')
         prev_week_start = (pd.Timestamp(week_start) - timedelta(days=7)).strftime('%Y-%m-%d')
         prev_week_end = (pd.Timestamp(week_start) - timedelta(days=1)).strftime('%Y-%m-%d')
@@ -379,9 +380,10 @@ def calculate_weekly_ohlc(df, symbol):
     weekly_ohlc.to_csv(f"weekly_ohlc_{symbol}.csv", index=False)
     print(f"Saved weekly OHLC data to weekly_ohlc_{symbol}.csv")
 
-    # Merge into main DataFrame
-    df = df.merge(weekly_ohlc[['week', 'prev_high', 'prev_low', 'prev_close', 'prev_open']], 
-                  on='week', how='left')
+    # Merge into main DataFrame using current_week
+    df = df.merge(weekly_ohlc[['current_week', 'prev_high', 'prev_low', 'prev_close', 'prev_open']], 
+                  left_on='week', right_on='current_week', how='left')
+    df = df.drop(columns=['current_week'], errors='ignore')
     df[['prev_high', 'prev_low', 'prev_close', 'prev_open']] = \
         df[['prev_high', 'prev_low', 'prev_close', 'prev_open']].ffill()
 
@@ -463,8 +465,6 @@ def calculate_weekly_demark_pivots(df, symbol):
 
     print(f"✅ Weekly DeMark Pivots for {symbol}:\n", weekly_df.head())
     return df
-
-
 
 def getExchangeSegment(symbol):
     df = credentials.TOKEN_MAP
@@ -555,7 +555,7 @@ def apply_Weekly_conditions(df):
 def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
     today_ist = datetime.now(pytz.timezone("Asia/Kolkata"))
     to_date = today_ist.replace(hour=15, minute=30, second=0, microsecond=0)
-    from_date = to_date - timedelta(days=21)  # Ensure at least two weeks
+    from_date = to_date - timedelta(days=28)  # Extended to 28 days for robustness
     from_date_format = from_date.strftime("%Y-%m-%d 09:15")
     to_date_format = to_date.strftime("%Y-%m-%d 15:30")
     print(f"📅 Fetching data for {symbol} from {from_date_format} to {to_date_format}")
@@ -582,6 +582,10 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
                 continue
 
             df = pd.DataFrame(response['data'], columns=['timestamp', 'O', 'H', 'L', 'C', 'V'])
+            # Save raw data for debugging
+            df.to_csv(f"raw_data_{symbol}.csv", index=False)
+            print(f"Saved raw data for {symbol} to raw_data_{symbol}.csv")
+            
             df = calculate_indicators(df, symbol)
             df = calculate_supertrend(df)
             df = calculate_camarilla_pivots(df)
