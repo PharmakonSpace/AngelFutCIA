@@ -317,7 +317,8 @@ def calculate_camarilla_pivots(df):
 def calculate_weekly_ohlc(df, symbol):
     """
     Calculate previous week's OHLC data for a given DataFrame.
-    Returns the DataFrame with merged prev_high, prev_low, prev_close, prev_open columns.
+    Returns the DataFrame with merged prev_high, prev_low, prev_close, prev_open columns,
+    correctly aligned with the current week.
     """
     if df.empty:
         print(f"⚠️ DataFrame is empty for {symbol}, skipping weekly OHLC calculation.")
@@ -332,7 +333,7 @@ def calculate_weekly_ohlc(df, symbol):
         print(f"❌ Missing required columns for weekly OHLC: {set(required_cols) - set(df.columns)}")
         return df
 
-    # Define week boundaries (Sunday-to-Sunday for consistency)
+    # Define week boundaries (Monday-to-Sunday for NSE trading week)
     df['week'] = df['timestamp'].dt.to_period('W-SUN').apply(lambda r: r.start_time)
 
     # Ensure at least two weeks of data
@@ -345,21 +346,37 @@ def calculate_weekly_ohlc(df, symbol):
     weekly_ohlc = (
         df.groupby('week')
         .agg(
-            prev_high=('high', 'max'),
-            prev_low=('low', 'min'),
-            prev_close=('close', 'last'),
-            prev_open=('open', 'first')
+            high=('high', 'max'),
+            low=('low', 'min'),
+            close=('close', 'last'),
+            open=('open', 'first')
         )
-        .shift(1)  # Use previous week's data
-        .dropna()  # Drop rows with NaN (no previous week)
         .reset_index()
     )
 
-    # Debug: Print weekly OHLC
-    print(f"Weekly OHLC for {symbol} (Previous Week):\n", weekly_ohlc.head())
+    # Shift to get previous week's OHLC and rename columns
+    weekly_ohlc['prev_high'] = weekly_ohlc['high'].shift(1)
+    weekly_ohlc['prev_low'] = weekly_ohlc['low'].shift(1)
+    weekly_ohlc['prev_close'] = weekly_ohlc['close'].shift(1)
+    weekly_ohlc['prev_open'] = weekly_ohlc['open'].shift(1)
+
+    # Drop rows where previous week data is missing
+    weekly_ohlc = weekly_ohlc.dropna(subset=['prev_high', 'prev_low', 'prev_close', 'prev_open'])
+
+    # Debug: Print weekly OHLC with week ranges
+    print(f"Weekly OHLC for {symbol} (Previous Week):")
+    for idx, row in weekly_ohlc.iterrows():
+        week_start = row['week']
+        week_end = (pd.Timestamp(week_start) + timedelta(days=6)).strftime('%Y-%m-%d')
+        prev_week_start = (pd.Timestamp(week_start) - timedelta(days=7)).strftime('%Y-%m-%d')
+        prev_week_end = (pd.Timestamp(week_start) - timedelta(days=1)).strftime('%Y-%m-%d')
+        print(f"  Current Week: {week_start} to {week_end}")
+        print(f"  Previous Week OHLC (for {prev_week_start} to {prev_week_end}):")
+        print(f"    prev_high={row['prev_high']}, prev_low={row['prev_low']}, "
+              f"prev_close={row['prev_close']}, prev_open={row['prev_open']}")
 
     # Save to CSV for validation
-    weekly_ohlc.to_csv(f"weekly_ohlc_{symbol}.csv")
+    weekly_ohlc.to_csv(f"weekly_ohlc_{symbol}.csv", index=False)
     print(f"Saved weekly OHLC data to weekly_ohlc_{symbol}.csv")
 
     # Merge into main DataFrame
@@ -585,7 +602,6 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
 
     print(f"❌ API failed for {symbol} after 3 attempts.")
     return None
-
 
 if __name__ == '__main__':
     initializeSymbolTokenMap()
