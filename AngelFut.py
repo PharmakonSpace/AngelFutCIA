@@ -472,7 +472,7 @@ def apply_bull_bear_conditions(df):
     df.loc[(bear_continue) & (df['Signal'] == 'Neutral'), 'Signal'] = 'BearContinue'
 
     # Remove Neutral rows
-    df = df[df['Signal'] != 'Neutral']
+    #df = df[df['Signal'] != 'Neutral']
 
     return df
 
