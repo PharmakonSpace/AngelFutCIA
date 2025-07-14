@@ -325,7 +325,11 @@ def calculate_weekly_ohlc(df, symbol):
         return df
 
     # Ensure timestamp is in datetime format
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    try:
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+    except Exception as e:
+        print(f"❌ Error converting timestamp for {symbol}: {str(e)}")
+        return df
 
     # Ensure required columns exist
     required_cols = ['high', 'low', 'close', 'open']
@@ -361,6 +365,12 @@ def calculate_weekly_ohlc(df, symbol):
     weekly_ohlc['prev_close'] = weekly_ohlc['close']
     weekly_ohlc['prev_open'] = weekly_ohlc['open']
 
+    # Add prev_week_range for clarity in Google Sheet
+    weekly_ohlc['prev_week_range'] = weekly_ohlc['week'].apply(
+        lambda x: f"{(pd.Timestamp(x) - timedelta(days=7)).strftime('%Y-%m-%d')} to "
+                  f"{(pd.Timestamp(x) - timedelta(days=1)).strftime('%Y-%m-%d')}"
+    )
+
     # Drop rows where current_week is NaN (last week has no next week)
     weekly_ohlc = weekly_ohlc.dropna(subset=['current_week'])
 
@@ -377,11 +387,11 @@ def calculate_weekly_ohlc(df, symbol):
               f"prev_close={row['prev_close']:.2f}, prev_open={row['prev_open']:.2f}")
 
     # Merge into main DataFrame using current_week
-    df = df.merge(weekly_ohlc[['current_week', 'prev_high', 'prev_low', 'prev_close', 'prev_open']], 
+    df = df.merge(weekly_ohlc[['current_week', 'prev_high', 'prev_low', 'prev_close', 'prev_open', 'prev_week_range']], 
                   left_on='week', right_on='current_week', how='left')
     df = df.drop(columns=['current_week'], errors='ignore')
-    df[['prev_high', 'prev_low', 'prev_close', 'prev_open']] = \
-        df[['prev_high', 'prev_low', 'prev_close', 'prev_open']].ffill()
+    df[['prev_high', 'prev_low', 'prev_close', 'prev_open', 'prev_week_range']] = \
+        df[['prev_high', 'prev_low', 'prev_close', 'prev_open', 'prev_week_range']].ffill()
 
     return df
 
@@ -400,7 +410,7 @@ def calculate_weekly_camarilla_pivots(df, symbol):
         return df
 
     # Create a DataFrame with unique weeks for pivot calculations
-    weekly_df = df[['week', 'prev_high', 'prev_low', 'prev_close']].drop_duplicates(subset='week')
+    weekly_df = df[['week', 'prev_high', 'prev_low', 'prev_close', 'prev_week_range']].drop_duplicates(subset='week')
 
     # Camarilla Pivot Calculations
     weekly_df['W_PP'] = (weekly_df['prev_high'] + weekly_df['prev_low'] + weekly_df['prev_close']) / 3
@@ -422,10 +432,8 @@ def calculate_weekly_camarilla_pivots(df, symbol):
     for idx, row in weekly_df.iterrows():
         week_start = row['week']
         week_end = (pd.Timestamp(week_start) + timedelta(days=6)).strftime('%Y-%m-%d')
-        prev_week_start = (pd.Timestamp(week_start) - timedelta(days=7)).strftime('%Y-%m-%d')
-        prev_week_end = (pd.Timestamp(week_start) - timedelta(days=1)).strftime('%Y-%m-%d')
         print(f"  Current Week: {week_start} to {week_end}")
-        print(f"  Previous Week OHLC (from {prev_week_start} to {prev_week_end}):")
+        print(f"  Previous Week OHLC ({row['prev_week_range']}):")
         print(f"    prev_high={row['prev_high']:.2f}, prev_low={row['prev_low']:.2f}, "
               f"prev_close={row['prev_close']:.2f}")
         print(f"    W_PP={row['W_PP']:.2f}, W_R1={row['W_R1']:.2f}, ..., W_S4={row['W_S4']:.2f}")
@@ -447,7 +455,7 @@ def calculate_weekly_demark_pivots(df, symbol):
         return df
 
     # Create a DataFrame with unique weeks for pivot calculations
-    weekly_df = df[['week', 'prev_high', 'prev_low', 'prev_close', 'prev_open']].drop_duplicates(subset='week')
+    weekly_df = df[['week', 'prev_high', 'prev_low', 'prev_close', 'prev_open', 'prev_week_range']].drop_duplicates(subset='week')
 
     # Apply DeMark conditional logic
     conditions = [
@@ -476,10 +484,8 @@ def calculate_weekly_demark_pivots(df, symbol):
     for idx, row in weekly_df.iterrows():
         week_start = row['week']
         week_end = (pd.Timestamp(week_start) + timedelta(days=6)).strftime('%Y-%m-%d')
-        prev_week_start = (pd.Timestamp(week_start) - timedelta(days=7)).strftime('%Y-%m-%d')
-        prev_week_end = (pd.Timestamp(week_start) - timedelta(days=1)).strftime('%Y-%m-%d')
         print(f"  Current Week: {week_start} to {week_end}")
-        print(f"  Previous Week OHLC (from {prev_week_start} to {prev_week_end}):")
+        print(f"  Previous Week OHLC ({row['prev_week_range']}):")
         print(f"    prev_high={row['prev_high']:.2f}, prev_low={row['prev_low']:.2f}, "
               f"prev_close={row['prev_close']:.2f}, prev_open={row['prev_open']:.2f}")
         print(f"    PP_Demark={row['PP_Demark']:.2f}, R1_Demark={row['R1_Demark']:.2f}, "
@@ -574,55 +580,74 @@ def apply_Weekly_conditions(df):
     return df
 
 def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
-    today_ist = datetime.now(pytz.timezone("Asia/Kolkata"))
-    to_date = today_ist.replace(hour=15, minute=30, second=0, microsecond=0)
-    from_date = to_date - timedelta(days=28)  # 28 days for robustness
-    from_date_format = from_date.strftime("%Y-%m-%d 09:15")
-    to_date_format = to_date.strftime("%Y-%m-%d 15:30")
-    print(f"📅 Fetching data for {symbol} from {from_date_format} to {to_date_format}")
+    try:
+        # Get current time in IST
+        today_ist = datetime.now(pytz.timezone("Asia/Kolkata"))
+        if today_ist is None or pd.isna(today_ist):
+            raise ValueError(f"Invalid current time for {symbol}: {today_ist}")
 
-    if not token or pd.isna(token):
-        print(f"❌ Error: Invalid token ({token}) for {symbol}")
-        return None
+        # Set to_date to 3:30 PM IST
+        to_date = today_ist.replace(hour=15, minute=30, second=0, microsecond=0)
+        if pd.isna(to_date):
+            raise ValueError(f"Invalid to_date for {symbol}: {to_date}")
+
+        # Calculate from_date (28 days earlier)
+        from_date = to_date - timedelta(days=28)
+        if pd.isna(from_date):
+            raise ValueError(f"Invalid from_date for {symbol}: {from_date}")
+
+        # Format dates for API
+        from_date_format = from_date.strftime("%Y-%m-%d 09:15")
+        to_date_format = to_date.strftime("%Y-%m-%d 15:30")
+        print(f"📅 Fetching data for {symbol} from {from_date_format} to {to_date_format}")
+
+        if not token or pd.isna(token):
+            print(f"❌ Error: Invalid token ({token}) for {symbol}")
+            return None
     
-    exchange = getExchangeSegment(symbol)
-    for attempt in range(3):
-        try:
-            historicParam = {
-                "exchange": exchange,
-                "symboltoken": str(token),
-                "interval": interval,
-                "fromdate": from_date_format,
-                "todate": to_date_format
-            }
-            response = credentials.SMART_API_OBJ.getCandleData(historicParam)
+        exchange = getExchangeSegment(symbol)
+        for attempt in range(3):
+            try:
+                historicParam = {
+                    "exchange": exchange,
+                    "symboltoken": str(token),
+                    "interval": interval,
+                    "fromdate": from_date_format,
+                    "todate": to_date_format
+                }
+                response = credentials.SMART_API_OBJ.getCandleData(historicParam)
 
-            if not response or 'data' not in response or not response['data']:
-                print(f"⚠️ API returned empty data for {symbol}. Retrying... (Attempt {attempt + 1}/3)")
+                if not response or 'data' not in response or not response['data']:
+                    print(f"⚠️ API returned empty data for {symbol}. Retrying... (Attempt {attempt + 1}/3)")
+                    sleep(2)
+                    continue
+
+                df = pd.DataFrame(response['data'], columns=['timestamp', 'O', 'H', 'L', 'C', 'V'])
+                df = calculate_indicators(df, symbol)
+                df = calculate_supertrend(df)
+                df = calculate_camarilla_pivots(df)
+                # Calculate weekly OHLC first
+                df = calculate_weekly_ohlc(df, symbol)
+                # Use pre-computed weekly OHLC for pivot calculations
+                df = calculate_weekly_camarilla_pivots(df, symbol)
+                df = calculate_weekly_demark_pivots(df, symbol)
+                df = calculate_chaikin_volatility(df)
+                df = calculate_rvi(df)
+                df = apply_bull_bear_conditions(df)
+                df = apply_Weekly_conditions(df)
+                return df
+
+            except Exception as e:
+                print(f"⚠️ API error for {symbol} (Attempt {attempt + 1}/3): {str(e)}")
                 sleep(2)
                 continue
 
-            df = pd.DataFrame(response['data'], columns=['timestamp', 'O', 'H', 'L', 'C', 'V'])
-            df = calculate_indicators(df, symbol)
-            df = calculate_supertrend(df)
-            df = calculate_camarilla_pivots(df)
-            # Calculate weekly OHLC first
-            df = calculate_weekly_ohlc(df, symbol)
-            # Use pre-computed weekly OHLC for pivot calculations
-            df = calculate_weekly_camarilla_pivots(df, symbol)
-            df = calculate_weekly_demark_pivots(df, symbol)
-            df = calculate_chaikin_volatility(df)
-            df = calculate_rvi(df)
-            df = apply_bull_bear_conditions(df)
-            df = apply_Weekly_conditions(df)
-            return df
+        print(f"❌ API failed for {symbol} after 3 attempts.")
+        return None
 
-        except Exception as e:
-            print(f"❌ Error fetching data for {symbol}: {str(e)}")
-            return None
-
-    print(f"❌ API failed for {symbol} after 3 attempts.")
-    return None
+    except Exception as e:
+        print(f"❌ Error in getHistoricalAPI for {symbol}: {str(e)}")
+        return None
 
 if __name__ == '__main__':
     initializeSymbolTokenMap()
