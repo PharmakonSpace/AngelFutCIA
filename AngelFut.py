@@ -544,8 +544,8 @@ def getHistoricalAPI(symbol, token, interval='ONE_HOUR'):
             df = calculate_weekly_demark_pivots(df)
             df = calculate_chaikin_volatility(df)
             df=  calculate_rvi(df)
-            df = apply_Weekly_conditions(df)
             df = apply_bull_bear_conditions(df)
+            df = apply_Weekly_conditions(df)
             
             return df
 
