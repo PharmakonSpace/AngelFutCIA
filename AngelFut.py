@@ -486,12 +486,12 @@ def apply_Weekly_conditions(df):
     # Continuation signals
     Weekly_Breakout = (
         (df['close'] > df['prev_high']) &
-        (df['low'] < df['prev_high'])
+        (df['close'].shift(1) <= df['prev_high'])
     )
 
     Weekly_Breakdown = (
         (df['close'] < df['prev_low']) &
-        (df['high'] > df['prev_low'])
+        (df['close'].shift(1) >= df['prev_low'])
     )
 
    
