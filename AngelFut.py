@@ -438,7 +438,7 @@ def apply_bull_bear_conditions(df):
     bull_condition = (
         (df['close'] > df['Supertrend']) &
         (df['close'] > df['R1_Demark']) &
-        (df['close'].shift(1) < df['R1_Demark']) &
+        (df['close'].shift(1) < df['R1_Demark']) 
         #(df['ChaikinVolatility'] > 0) &
         #(df['RVI'] > 50)
     )
@@ -447,7 +447,7 @@ def apply_bull_bear_conditions(df):
     bear_condition = (
         (df['close'] < df['Supertrend']) &
         (df['close'] < df['S1_Demark']) &
-        (df['close'].shift(1) > df['S1_Demark']) &
+        (df['close'].shift(1) > df['S1_Demark']) 
         #(df['ChaikinVolatility'] < 0) &
         #(df['RVI'] < 50)
     )
