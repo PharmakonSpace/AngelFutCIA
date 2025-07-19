@@ -583,6 +583,10 @@ if __name__ == '__main__':
     if all_data:
         final_df = pd.concat(all_data, ignore_index=True)
         final_df['timestamp'] = pd.to_datetime(final_df['timestamp'], utc=True).dt.tz_convert(IST_TZ)
+
+        # Filter rows where both Signal is Neutral AND WeeklySignal is WNeutral
+        final_df = final_df[~((final_df['Signal'] == 'Neutral') & (final_df['WeeklySignal'] == 'WNeutral'))]
+    
         final_df.to_csv(OUTPUT_FILE, index=False)
         # Convert all datetime columns in final_df to string
         final_df = final_df.applymap(flatten_data)
