@@ -4,7 +4,7 @@ SmartApi-python
 gspread
 oauth2client
 pandas
-pandas-ta
+pandas_ta
 ta
 pyotp
 pytz
