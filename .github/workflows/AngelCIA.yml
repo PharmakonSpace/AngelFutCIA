@@ -1,7 +1,6 @@
 name: Run CIACAM
 
 on:
-  
   schedule:
     - cron: '45 3 * * 1-5'   # 09:15 AM IST
     - cron: '45 4 * * 1-5'   # 10:15 AM IST
@@ -30,7 +29,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: .venv
-          key: ${{ runner.os }}-py-${{ steps.setup-python.outputs.python-version }}-venv-v3-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-py-${{ steps.setup-python.outputs.python-version }}-venv-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-py-${{ steps.setup-python.outputs.python-version }}-venv-
 
@@ -41,10 +40,15 @@ jobs:
           fi
           .venv/bin/pip install --upgrade pip setuptools wheel
 
-      - name: Install dependencies (force reinstall)
+      - name: Ensure dependencies are installed
         run: |
-          echo "Installing/upgrading all dependencies..."
-          .venv/bin/pip install --upgrade --force-reinstall -r requirements.txt
+          missing=$(.venv/bin/pip check 2>&1 || true)
+          if [ -n "$missing" ]; then
+            echo "⚠️ Missing or broken dependencies detected, installing..."
+            .venv/bin/pip install --upgrade -r requirements.txt
+          else
+            echo "✅ All dependencies already satisfied, skipping reinstall"
+          fi
 
       - name: Load environment variables
         run: |
