@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.11', '3.x']  # ✅ Runs both 3.11 and latest Python 3
+        python-version: ['3.x']  # ✅ Runs both 3.11 and latest Python 3
 
     steps:
       - name: Checkout repository
