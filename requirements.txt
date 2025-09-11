@@ -18,3 +18,4 @@ datetime
 urllib3
 schedule
 gspread_dataframe
+requests
