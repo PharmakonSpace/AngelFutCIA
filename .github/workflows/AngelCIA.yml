@@ -16,41 +16,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Set up Python 3.x
       - name: Set up Python
-        id: setup-python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
-      # 3️⃣ Cache virtual environment
-      - name: Cache virtual environment
+      # ✅ Cache pip packages, not the virtual environment
+      - name: Cache pip
         uses: actions/cache@v3
         with:
-          path: .venv
-          key: ${{ runner.os }}-py-${{ steps.setup-python.outputs.python-version }}-venv-${{ hashFiles('**/requirements.txt') }}
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-py-${{ steps.setup-python.outputs.python-version }}-venv-
+            ${{ runner.os }}-pip-
 
-      # 4️⃣ Set up virtual environment & upgrade pip
       - name: Set up virtual environment
         run: |
-          if [ ! -d ".venv" ]; then
-            python -m venv .venv
-          fi
+          python -m venv .venv
           .venv/bin/pip install --upgrade pip setuptools wheel
+          .venv/bin/pip install -r requirements.txt
 
-      # 5️⃣ Install dependencies (skip reinstall if already satisfied)
-      - name: Install dependencies
-        run: |
-          echo "Installing/upgrading dependencies..."
-          .venv/bin/pip install --upgrade -r requirements.txt
-
-      # 6️⃣ Load environment variables
       - name: Load environment variables
         run: |
           echo "USER_NAME=${{ secrets.USER_NAME }}" >> $GITHUB_ENV
@@ -61,26 +49,23 @@ jobs:
           echo "FEED_TOKEN=${{ secrets.FEED_TOKEN }}" >> $GITHUB_ENV
           echo "SHEET_ID=${{ secrets.SHEET_ID }}" >> $GITHUB_ENV
 
-      # 7️⃣ Debug environment
-      - name: Debug environment & installed packages
-        run: |
-          env | grep -E 'USER_NAME|PWD|TOTP_SECRET|API_KEY|TOKEN_MAP|FEED_TOKEN|SHEET_ID'
-          .venv/bin/pip list
+      - name: Debug environment variables
+        run: env | grep -E 'USER_NAME|PWD|TOTP_SECRET|API_KEY|TOKEN_MAP|FEED_TOKEN|SHEET_ID'
 
-      # 8️⃣ Run your script using virtual environment Python
-      - name: Run AngelFut.py
+      - name: Debug installed packages
+        run: .venv/bin/pip list
+
+      - name: Run login script
         env:
           GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
         run: .venv/bin/python AngelFut.py
 
-      # 9️⃣ Configure Git
       - name: Configure Git
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-      # 🔟 Commit & push generated files
-      - name: Add, commit, and push files
+      - name: Add and commit files
         run: |
           git add -A
           git commit -m "Auto-commit CSV, TXT, JSON, and log files" || true
