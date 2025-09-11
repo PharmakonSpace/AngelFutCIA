@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: '3.x'
 
-      # ✅ Cache pip packages, not the virtual environment
+      # ✅ Cache pip packages
       - name: Cache pip
         uses: actions/cache@v3
         with:
@@ -33,12 +33,30 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
+      # ✅ Set up virtual environment
       - name: Set up virtual environment
         run: |
-          python -m venv .venv
-          .venv/bin/pip install --upgrade pip setuptools wheel
-          .venv/bin/pip install -r requirements.txt
+          if [ ! -d ".venv" ]; then
+            echo "Creating new virtual environment..."
+            python -m venv .venv
+            .venv/bin/pip install --upgrade pip setuptools wheel
+          else
+            echo "Virtual environment restored from cache."
+          fi
 
+      # ✅ Install only missing or outdated packages
+      - name: Install dependencies if needed
+        run: |
+          .venv/bin/pip install --upgrade pip
+          MISSING=$(.venv/bin/pip check 2>&1 | grep -E "requires|missing" || true)
+          if [ -n "$MISSING" ]; then
+            echo "Installing/upgrading missing or outdated packages..."
+            .venv/bin/pip install --upgrade -r requirements.txt
+          else
+            echo "All packages are installed and up-to-date."
+          fi
+
+      # ✅ Load environment variables
       - name: Load environment variables
         run: |
           echo "USER_NAME=${{ secrets.USER_NAME }}" >> $GITHUB_ENV
@@ -48,24 +66,27 @@ jobs:
           echo "TOKEN_MAP=${{ secrets.TOKEN_MAP }}" >> $GITHUB_ENV
           echo "FEED_TOKEN=${{ secrets.FEED_TOKEN }}" >> $GITHUB_ENV
           echo "SHEET_ID=${{ secrets.SHEET_ID }}" >> $GITHUB_ENV
+          echo "GOOGLE_SHEETS_CREDENTIALS=${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}" >> $GITHUB_ENV
 
+      # ✅ Debug environment variables
       - name: Debug environment variables
-        run: env | grep -E 'USER_NAME|PWD|TOTP_SECRET|API_KEY|TOKEN_MAP|FEED_TOKEN|SHEET_ID'
+        run: env | grep -E 'USER_NAME|PWD|TOTP_SECRET|API_KEY|TOKEN_MAP|FEED_TOKEN|SHEET_ID|GOOGLE_SHEETS_CREDENTIALS'
 
+      # ✅ Debug installed packages
       - name: Debug installed packages
         run: .venv/bin/pip list
 
-      - name: Run login script
-        env:
-          GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
+      # ✅ Run main script
+      - name: Run AngelFut.py
         run: .venv/bin/python AngelFut.py
 
+      # ✅ Configure Git for auto-commit
       - name: Configure Git
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-      - name: Add and commit files
+      - name: Commit and push generated files
         run: |
           git add -A
           git commit -m "Auto-commit CSV, TXT, JSON, and log files" || true
