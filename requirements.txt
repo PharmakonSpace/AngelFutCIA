@@ -12,7 +12,7 @@ pycryptodome>=3.19.0
 openpyxl
 logzero
 websocket-client
-numpy==1.23.5
+numpy
 dateutils
 datetime
 urllib3
