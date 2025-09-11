@@ -262,18 +262,25 @@ def calculate_chaikin_volatility(df, ema_period=10, change_period=10):
 
 # Calculate Supertrend Indicator
 def calculate_supertrend(df, period=10, multiplier=3):
+    if df.empty:
+        print("⚠️ DataFrame is empty, skipping Supertrend calculation.")
+        return df
+
     # Rename columns to lowercase for pandas_ta compatibility
     df = df.rename(columns={'H': 'high', 'L': 'low', 'C': 'close'})
 
+    # Calculate Supertrend
     df.ta.supertrend(length=period, multiplier=multiplier, append=True)
 
-    # pandas_ta creates 'SUPERT_10_3.0' and 'SUPERTd_10_3.0' columns
-    supertrend_col = f"SUPERT_{period}_{multiplier}.0"
+    # Correct column name for Supertrend
+    supertrend_col = f"SUPERT_{period}_{multiplier}"
     
     if supertrend_col in df.columns:
         df.rename(columns={supertrend_col: 'Supertrend'}, inplace=True)
+        logging.info(f"✅ Supertrend column renamed to 'Supertrend' for period={period}, multiplier={multiplier}")
     else:
-        print(f"⚠️ Supertrend column {supertrend_col} not found in DataFrame.")
+        logging.error(f"⚠️ Supertrend column {supertrend_col} not found in DataFrame. Available columns: {df.columns}")
+        return df
 
     return df
 
