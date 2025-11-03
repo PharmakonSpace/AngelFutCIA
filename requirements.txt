@@ -3,7 +3,7 @@ python-dotenv
 SmartApi-python
 gspread
 oauth2client
-pandas==2.1.1
+pandas
 pandas_ta
 ta==0.10.1
 pyotp
