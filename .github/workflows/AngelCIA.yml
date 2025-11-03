@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: '3.x'
 
-      # Cache pip packages (faster installs)
+      # Cache pip packages (speeds up install)
       - name: Cache pip
         uses: actions/cache@v4
         with:
@@ -32,11 +32,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # Create virtual environment and install dependencies
-      - name: Set up virtual environment
+      # Install system dependencies needed for numba, llvmlite, and other compiled packages
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential llvm-dev libffi-dev python3-dev
+
+      # Create virtual environment and install Python packages
+      - name: Set up virtual environment and install dependencies
         run: |
           python -m venv .venv
           .venv/bin/pip install --upgrade pip setuptools wheel
+          .venv/bin/pip install llvmlite  # Preinstall for numba
           .venv/bin/pip install -r requirements.txt
 
       # Load environment variables from GitHub Secrets
