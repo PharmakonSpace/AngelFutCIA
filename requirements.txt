@@ -19,3 +19,5 @@ urllib3
 schedule
 gspread_dataframe
 requests
+numba==0.57.1
+llvmlite==0.40.1
