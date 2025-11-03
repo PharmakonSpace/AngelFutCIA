@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: '3.x'
 
-      # Cache pip packages (faster installs)
+      # Cache pip packages to speed up installs
       - name: Cache pip
         uses: actions/cache@v4
         with:
@@ -32,12 +32,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # Create virtual environment and install dependencies
-      - name: Set up virtual environment
+      # Create virtual environment and install dependencies using prebuilt wheels
+      - name: Set up virtual environment and install dependencies
         run: |
           python -m venv .venv
           .venv/bin/pip install --upgrade pip setuptools wheel
-          .venv/bin/pip install -r requirements.txt
+          # Force pip to use only prebuilt wheels, avoiding compilation errors
+          .venv/bin/pip install --only-binary=:all: -r requirements.txt
 
       # Load environment variables from GitHub Secrets
       - name: Load environment variables
