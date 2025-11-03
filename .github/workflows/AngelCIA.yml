@@ -19,11 +19,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Set up Python
+      # 2️⃣ Set up Python 3.11
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.11'
 
       # 3️⃣ Cache pip downloads
       - name: Cache pip
@@ -43,6 +43,7 @@ jobs:
       # 5️⃣ Set up virtual environment and install Python dependencies
       - name: Set up virtual environment
         run: |
+          # Remove old/broken venv
           if [ -d ".venv" ]; then
             rm -rf .venv
           fi
