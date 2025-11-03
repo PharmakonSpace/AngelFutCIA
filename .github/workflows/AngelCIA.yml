@@ -8,7 +8,7 @@ on:
     - cron: '45 7 * * 1-5'   # 01:15 PM IST
     - cron: '45 8 * * 1-5'   # 02:15 PM IST
     - cron: '41 9 * * 1-5'   # 03:15 PM IST
-  workflow_dispatch:          # Manual trigger
+  workflow_dispatch:
 
 jobs:
   scrape:
@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: '3.x'
 
-      # 3️⃣ Cache pip downloads (not .venv itself)
+      # 3️⃣ Cache pip downloads
       - name: Cache pip
         uses: actions/cache@v4
         with:
@@ -34,22 +34,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # 4️⃣ Create fresh virtual environment and install dependencies
+      # 4️⃣ Install system dependencies for numba/llvmlite
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential llvm-dev libffi-dev
+
+      # 5️⃣ Set up virtual environment and install Python dependencies
       - name: Set up virtual environment
         run: |
-          # Remove old/broken venv
           if [ -d ".venv" ]; then
             rm -rf .venv
           fi
-          # Create fresh venv
           python -m venv .venv
-          # Activate venv
           source .venv/bin/activate
-          # Upgrade pip and install dependencies
           pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
 
-      # 5️⃣ Load secrets as environment variables
+      # 6️⃣ Load environment variables
       - name: Load environment variables
         run: |
           echo "client_id=${{ secrets.CLIENT_ID }}" >> $GITHUB_ENV
@@ -61,23 +63,23 @@ jobs:
           echo "redirect_uri=${{ secrets.REDIRECT_URI }}" >> $GITHUB_ENV
           echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}" >> $GITHUB_ENV
 
-      # 6️⃣ Debug TOTP Key
+      # 7️⃣ Debug TOTP Key
       - name: Debug TOTP Key
         run: |
           echo "TOTP_KEY length: ${#TOTP_KEY}"
           echo "TOTP_KEY (masked): ${TOTP_KEY:0:4}******"
 
-      # 7️⃣ Debug environment variables
+      # 8️⃣ Debug environment variables
       - name: Debug environment variables
         run: env | grep -E 'client_id|APP_TYPE|secret_key|fyers_id|TOTP_KEY|pin|redirect_uri'
 
-      # 8️⃣ Debug installed packages
+      # 9️⃣ Debug installed packages
       - name: Debug installed packages
         run: |
           source .venv/bin/activate
           pip list
 
-      # 9️⃣ Run your main script
+      # 🔟 Run main script
       - name: Run login script
         env:
           GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
@@ -85,13 +87,13 @@ jobs:
           source .venv/bin/activate
           python AngelFut.py
 
-      # 🔟 Configure Git
+      # 1️⃣1️⃣ Configure Git
       - name: Configure Git
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-      # 1️⃣1️⃣ Commit and push changes
+      # 1️⃣2️⃣ Commit and push changes
       - name: Add, commit, and push changes
         run: |
           git add -A
