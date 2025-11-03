@@ -25,22 +25,27 @@ jobs:
         with:
           python-version: '3.x'
 
-      # 3️⃣ Cache virtual environment
-      - name: Cache virtual environment
+      # 3️⃣ Cache pip downloads (not .venv itself)
+      - name: Cache pip
         uses: actions/cache@v4
         with:
-          path: .venv
-          key: ${{ runner.os }}-venv-${{ hashFiles('**/requirements.txt') }}
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-venv-
+            ${{ runner.os }}-pip-
 
-      # 4️⃣ Create / activate virtual environment and install dependencies
+      # 4️⃣ Create fresh virtual environment and install dependencies
       - name: Set up virtual environment
         run: |
+          # Remove old/broken venv
+          if [ -d ".venv" ]; then
+            rm -rf .venv
+          fi
+          # Create fresh venv
           python -m venv .venv
           # Activate venv
           source .venv/bin/activate
-          # Upgrade pip & install dependencies
+          # Upgrade pip and install dependencies
           pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
 
