@@ -5,7 +5,7 @@ gspread
 oauth2client
 pandas
 pandas_ta
-ta==0.10.1
+ta
 pyotp
 pytz
 pycryptodome>=3.19.0
