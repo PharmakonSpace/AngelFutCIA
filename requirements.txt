@@ -12,13 +12,13 @@ pycryptodome>=3.19.0
 openpyxl
 logzero
 websocket-client
-numpy==1.26.4
+numpy
 dateutils
 datetime
 urllib3
 schedule
 gspread_dataframe
-requests==2.32.0
+requests
 numba==0.57.1
 llvmlite==0.40.1
 
